@@ -1,0 +1,11 @@
+.superpowers/
+node_modules/
+.env.local
+.env
+.next/
+dist/
+build/
+.DS_Store
+*.log
+/tmp/
+.vercel/
