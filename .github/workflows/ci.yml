@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          # Stubs so env.ts validation passes in CI. Real values are never
+          # used in build output — the env module just runs its Zod parse.
+          ANTHROPIC_API_KEY: sk-ant-ci-stub
+          NOTION_API_KEY: secret_ci-stub
+          NOTION_DB_AESTHETICS: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          NOTION_DB_LAYOUTS: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+          NOTION_DB_INTERACTIONS: cccccccccccccccccccccccccccccccc
+          NOTION_DB_SYSTEMS: dddddddddddddddddddddddddddddddd
+          ADMIN_SECRET: ci-build-stub-must-be-16-chars
