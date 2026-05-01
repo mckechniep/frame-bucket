@@ -17,10 +17,10 @@ describe('env', () => {
   const setValidEnv = () => {
     process.env.ANTHROPIC_API_KEY = FAKE_ANTHROPIC;
     process.env.NOTION_API_KEY = FAKE_NOTION_SECRET;
-    process.env.NOTION_DB_AESTHETICS = 'a'.repeat(32);
-    process.env.NOTION_DB_LAYOUTS = 'b'.repeat(32);
-    process.env.NOTION_DB_INTERACTIONS = 'c'.repeat(32);
-    process.env.NOTION_DB_SYSTEMS = 'd'.repeat(32);
+    process.env.NOTION_DATA_SOURCE_AESTHETICS = 'a'.repeat(32);
+    process.env.NOTION_DATA_SOURCE_LAYOUTS = 'b'.repeat(32);
+    process.env.NOTION_DATA_SOURCE_INTERACTIONS = 'c'.repeat(32);
+    process.env.NOTION_DATA_SOURCE_SYSTEMS = 'd'.repeat(32);
     process.env.ADMIN_SECRET = 'x'.repeat(20);
     delete process.env.VERCEL;
     delete process.env.BLOB_READ_WRITE_TOKEN;
@@ -66,7 +66,7 @@ describe('env', () => {
     const { env } = await import('../env');
 
     expect(env.ANTHROPIC_API_KEY).toBe(FAKE_ANTHROPIC);
-    expect(env.NOTION_DB_AESTHETICS.length).toBe(32);
+    expect(env.NOTION_DATA_SOURCE_AESTHETICS.length).toBe(32);
   });
 
   it('throws when VERCEL is set but BLOB_READ_WRITE_TOKEN is missing', async () => {

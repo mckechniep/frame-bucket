@@ -6,10 +6,10 @@ const EnvSchema = z
     NOTION_API_KEY: z
       .string()
       .regex(/^(secret_|ntn_)/, 'NOTION_API_KEY must start with secret_ or ntn_'),
-    NOTION_DB_AESTHETICS: z.string().length(32),
-    NOTION_DB_LAYOUTS: z.string().length(32),
-    NOTION_DB_INTERACTIONS: z.string().length(32),
-    NOTION_DB_SYSTEMS: z.string().length(32),
+    NOTION_DATA_SOURCE_AESTHETICS: z.string().length(32),
+    NOTION_DATA_SOURCE_LAYOUTS: z.string().length(32),
+    NOTION_DATA_SOURCE_INTERACTIONS: z.string().length(32),
+    NOTION_DATA_SOURCE_SYSTEMS: z.string().length(32),
     ADMIN_SECRET: z.string().min(16),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
     DAILY_COST_ALERT_USD: z.coerce.number().default(50),
