@@ -41,6 +41,11 @@ yarn-error.log*
 # local runtime output
 /tmp/
 
+# local data
+/data/taxonomy.json
+/data/sync-log.jsonl
+/tmp/generations/
+
 # vercel
 .vercel/
 
