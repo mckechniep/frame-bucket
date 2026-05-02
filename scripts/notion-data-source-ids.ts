@@ -24,8 +24,10 @@ if (fs.existsSync(envLocal)) {
 const HEX_32 = /^[a-f0-9]{32}$/i;
 
 function extractDbId(input: string): string {
-  if (HEX_32.test(input)) return input;
-  const match = input.match(/([a-f0-9]{32})/i);
+  // Strip dashes so dashed UUIDs (1af9e241-a70a-...) and URL forms both work.
+  const dashless = input.trim().replace(/-/g, '');
+  if (HEX_32.test(dashless)) return dashless;
+  const match = dashless.match(/([a-f0-9]{32})/i);
   if (match?.[1]) return match[1];
   throw new Error(`Not a Notion database ID or URL: ${input}`);
 }

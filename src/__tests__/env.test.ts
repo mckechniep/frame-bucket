@@ -78,6 +78,23 @@ describe('env', () => {
     await expect(import('../env')).rejects.toThrow(/BLOB_READ_WRITE_TOKEN.*VERCEL/);
   });
 
+  it('accepts dashed UUID for data source IDs and normalizes to 32 chars', async () => {
+    setValidEnv();
+    process.env.NOTION_DATA_SOURCE_AESTHETICS = '1af9e241-a70a-48d0-a6d3-8566f3f60cc6';
+
+    const { env } = await import('../env');
+
+    expect(env.NOTION_DATA_SOURCE_AESTHETICS).toBe('1af9e241a70a48d0a6d38566f3f60cc6');
+    expect(env.NOTION_DATA_SOURCE_AESTHETICS.length).toBe(32);
+  });
+
+  it('rejects malformed data source ID (non-hex chars)', async () => {
+    setValidEnv();
+    process.env.NOTION_DATA_SOURCE_AESTHETICS = 'g'.repeat(32);
+
+    await expect(import('../env')).rejects.toThrow(/must be a 32-char hex/);
+  });
+
   it('skips validation when SKIP_ENV_VALIDATION=1', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     process.env.SKIP_ENV_VALIDATION = '1';
