@@ -1,0 +1,42 @@
+{
+  "object": "page",
+  "id": "00000000-0000-0000-0000-0000000000aa",
+  "properties": {
+    "Name": {
+      "id": "title",
+      "type": "title",
+      "title": [{ "plain_text": "Editorial" }]
+    },
+    "Short Definition": {
+      "id": "short",
+      "type": "rich_text",
+      "rich_text": [
+        { "plain_text": "A type-led, content-first direction rooted in magazine design." }
+      ]
+    },
+    "Core Mood": {
+      "id": "mood",
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "Considered, editorial, unhurried." }]
+    },
+    "Best Use Case": {
+      "id": "usecase",
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "Brand stories, long-form content." }]
+    },
+    "Distinctive Signals": {
+      "id": "signals",
+      "type": "multi_select",
+      "multi_select": [
+        { "name": "type-led hierarchy" },
+        { "name": "generous whitespace" },
+        { "name": "asymmetric grids" }
+      ]
+    },
+    "Notes": {
+      "id": "notes",
+      "type": "rich_text",
+      "rich_text": [{ "plain_text": "Editorial shines when content is actually good." }]
+    }
+  }
+}
