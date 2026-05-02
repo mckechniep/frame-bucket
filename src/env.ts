@@ -26,9 +26,15 @@ const EnvSchema = z
     },
   );
 
+// Skip during `next build` (NEXT_PHASE) and explicit opt-out (CI/Docker).
+// Routes evaluate at module load during build; env access only happens at
+// request time, so build-time validation would crash valid module code.
+const skipValidation =
+  process.env.SKIP_ENV_VALIDATION === '1' || process.env.NEXT_PHASE === 'phase-production-build';
+
 const parsed = EnvSchema.safeParse(process.env);
 
-if (!parsed.success) {
+if (!skipValidation && !parsed.success) {
   const issues = parsed.error.issues
     .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
     .join('\n');
@@ -36,5 +42,5 @@ if (!parsed.success) {
   throw new Error(`Invalid environment variables:\n${issues}`);
 }
 
-export const env = parsed.data;
 export type Env = z.infer<typeof EnvSchema>;
+export const env: Env = parsed.success ? parsed.data : ({} as Env);

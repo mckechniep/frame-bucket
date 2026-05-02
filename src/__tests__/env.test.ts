@@ -29,6 +29,8 @@ describe('env', () => {
   beforeEach(() => {
     vi.resetModules();
     process.env = { ...oldEnv };
+    delete process.env.SKIP_ENV_VALIDATION;
+    delete process.env.NEXT_PHASE;
   });
 
   it('throws when ANTHROPIC_API_KEY is missing', async () => {
@@ -74,6 +76,20 @@ describe('env', () => {
     process.env.VERCEL = '1';
 
     await expect(import('../env')).rejects.toThrow(/BLOB_READ_WRITE_TOKEN.*VERCEL/);
+  });
+
+  it('skips validation when SKIP_ENV_VALIDATION=1', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.SKIP_ENV_VALIDATION = '1';
+
+    await expect(import('../env')).resolves.toBeDefined();
+  });
+
+  it('skips validation during next build phase', async () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    process.env.NEXT_PHASE = 'phase-production-build';
+
+    await expect(import('../env')).resolves.toBeDefined();
   });
 
   it('parses when VERCEL is set with BLOB_READ_WRITE_TOKEN', async () => {
