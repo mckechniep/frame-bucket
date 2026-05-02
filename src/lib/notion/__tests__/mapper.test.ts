@@ -40,6 +40,31 @@ describe('mapNotionPageToEntry', () => {
     expect(entry.hasOverride).toBe(false);
   });
 
+  it('respects parenthesized commas in rich_text fallback (no premature split)', () => {
+    const variant = {
+      ...samplePage,
+      properties: {
+        ...samplePage.properties,
+        'Distinctive Signals': {
+          id: 'signals',
+          type: 'rich_text',
+          rich_text: [
+            {
+              plain_text:
+                'Monospace typography (Courier, IBM Plex Mono, Fira Code), green or amber on black, scanline overlays',
+            },
+          ],
+        },
+      },
+    };
+    const entry = mapNotionPageToEntry(variant as never, 'aesthetic', false);
+    expect(entry.distinctiveSignals).toEqual([
+      'Monospace typography (Courier, IBM Plex Mono, Fira Code)',
+      'green or amber on black',
+      'scanline overlays',
+    ]);
+  });
+
   it('throws when Short Definition is missing', () => {
     const broken = {
       ...samplePage,

@@ -40,8 +40,10 @@ function getMultiSelectOrCommaSplit(prop: unknown): string[] {
   }
   const text = getPlainText(prop);
   if (!text) return [];
+  // Split on commas that aren't inside parens, so "Type (Courier, Fira Code), …"
+  // stays as one signal. Single-level-deep parens only — nested parens not handled.
   return text
-    .split(',')
+    .split(/,(?![^(]*\))/)
     .map((s) => s.trim())
     .filter(Boolean);
 }
