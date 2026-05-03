@@ -2,14 +2,26 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Bucket } from '@/lib/types';
 
-const AESTHETICS_ROOT = path.join(
-  process.cwd(),
-  'src',
-  'lib',
-  'prompts',
-  'craft-canon',
-  'aesthetics',
-);
+const PROMPTS_ROOT = path.join(process.cwd(), 'src', 'lib', 'prompts');
+const CANON_ROOT = path.join(PROMPTS_ROOT, 'craft-canon');
+const AESTHETICS_ROOT = path.join(CANON_ROOT, 'aesthetics');
+
+export async function loadBaseCanon(): Promise<string> {
+  return fs.readFile(path.join(CANON_ROOT, 'base.md'), 'utf-8');
+}
+
+export async function loadOutputContract(): Promise<string> {
+  return fs.readFile(path.join(PROMPTS_ROOT, 'output-contract.md'), 'utf-8');
+}
+
+export async function loadAestheticOverride(id: string): Promise<string | null> {
+  try {
+    return await fs.readFile(path.join(AESTHETICS_ROOT, `${id}.md`), 'utf-8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
+  }
+}
 
 export async function listAestheticOverrides(): Promise<string[]> {
   try {
@@ -24,10 +36,5 @@ export async function listAestheticOverrides(): Promise<string[]> {
 
 export async function hasOverride(bucket: Bucket, id: string): Promise<boolean> {
   if (bucket !== 'aesthetic') return false;
-  try {
-    await fs.access(path.join(AESTHETICS_ROOT, `${id}.md`));
-    return true;
-  } catch {
-    return false;
-  }
+  return (await loadAestheticOverride(id)) !== null;
 }
