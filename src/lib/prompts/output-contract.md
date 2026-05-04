@@ -30,11 +30,17 @@ You are producing a single self-contained HTML file. Every rule below is mandato
 
 ## Images
 
-- Use `https://source.unsplash.com/...` URLs (e.g., `https://source.unsplash.com/random/1600x900/?bakery`). (→ source: spec §7.3)
-- Every `<img>` carries explicit `width` and `height` attributes. No exceptions. (→ source: rules/web/performance.md)
+Images use a placeholder pattern. The pipeline post-processes your output, generating real images via OpenRouter (Gemini 2.5 Flash Image) for each `<img>` tag whose `src` begins with `OPENROUTER:`. Your job is to specify what each image _should depict_, with proper dimensions and alt text.
+
+- **Image src is `OPENROUTER:<descriptive prompt>`**. The prompt should be a concise but specific scene description — what the image depicts, the mood, the lighting, the composition. Examples:
+  - `src="OPENROUTER:A row of dark-crusted country sourdough loaves cooling on a wooden rack, dusted with flour, lit by morning window light"`
+  - `src="OPENROUTER:Aerial overhead shot of an architect's drafting desk with technical pens, ruler, and a half-finished elevation drawing in soft afternoon light"`
+- **Never use external image URLs** — no Unsplash, no Picsum, no Pexels, no stock-photo services. Always emit `OPENROUTER:` placeholders. (The post-processor replaces them with real generated images.)
+- Every `<img>` carries explicit `width` and `height` attributes — they drive the aspect-ratio selection sent to the image model. Common useful ratios: 1600×900 (16:9 hero), 1200×900 (4:3), 1024×1024 (1:1), 900×1200 (3:4 portrait). (→ source: rules/web/performance.md)
 - Hero/above-the-fold image: `loading="eager"` and `fetchpriority="high"`. Exactly one. (→ source: rules/web/performance.md)
 - All other images: `loading="lazy"`. (→ source: rules/web/performance.md)
-- Descriptive `alt` text — what the image _is_, not "image of...". Decorative-only images use `alt=""`. (→ source: rules/web/performance.md)
+- Descriptive `alt` text — what the image _is_, not "image of...". The alt text is for accessibility; the `OPENROUTER:` src is for image generation. They serve different purposes; both should be specific. (→ source: rules/web/performance.md)
+- **Background images** in CSS (`background-image: url(...)`) are not supported by the post-processor. If a section needs a background image, place an `<img>` element with `OPENROUTER:` src and use CSS to position it (`position: absolute; inset: 0; object-fit: cover;`). (→ source: rules/web/performance.md)
 
 ## Semantic HTML
 
