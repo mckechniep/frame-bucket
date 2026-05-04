@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { assembleGenerationRequest } from '@/lib/prompts/assembler';
 import { getAnthropicClient } from '@/lib/anthropic/client';
 import { defaultArchiveStore } from '@/lib/generation/archive';
+import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
 import type { Recipe } from '@/lib/types';
 
@@ -64,6 +65,14 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Inject images for any OPENROUTER: placeholder <img> tags.
+        const placeholderCount = countImagePlaceholders(html);
+        if (placeholderCount > 0) {
+          send('images_started', { count: placeholderCount });
+          html = await injectImages(html);
+          send('images_done', { count: placeholderCount });
+        }
+
         const cost = estimateCost({
           model: request.model,
           inputTokens: usage.inputTokens,
@@ -83,7 +92,7 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         });
 
-        send('done', { archiveId, usage, cost });
+        send('done', { archiveId, usage, cost, imagesInjected: placeholderCount, html });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'generation failed';
         send('error', { message });

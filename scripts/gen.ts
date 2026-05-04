@@ -36,6 +36,7 @@ async function main(): Promise<void> {
   const { assembleGenerationRequest } = await import('@/lib/prompts/assembler');
   const { getAnthropicClient } = await import('@/lib/anthropic/client');
   const { defaultArchiveStore } = await import('@/lib/generation/archive');
+  const { injectImages, countImagePlaceholders } = await import('@/lib/generation/inject-images');
   const { estimateCost, formatUsd } = await import('@/lib/cost');
   const { defaultFileStore } = await import('@/lib/taxonomy/file-store');
 
@@ -101,6 +102,16 @@ async function main(): Promise<void> {
     `Tokens — in: ${usage.inputTokens}, cacheRead: ${usage.cacheReadTokens}, out: ${usage.outputTokens}`,
   );
   console.log(`Cost: ${formatUsd(cost)}`);
+
+  const placeholderCount = countImagePlaceholders(html);
+  if (placeholderCount > 0) {
+    console.log(
+      `Generating ${placeholderCount} image${placeholderCount === 1 ? '' : 's'} via OpenRouter...`,
+    );
+    const tImg = Date.now();
+    html = await injectImages(html);
+    console.log(`Images: ${((Date.now() - tImg) / 1000).toFixed(1)}s`);
+  }
 
   const archive = defaultArchiveStore();
   const id = await archive.save({

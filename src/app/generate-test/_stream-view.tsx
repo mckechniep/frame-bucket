@@ -5,12 +5,17 @@ import type { Recipe } from '@/lib/types';
 interface StreamStats {
   cost: number;
   usage: { inputTokens: number; outputTokens: number; cacheReadTokens: number };
+  imagesInjected?: number;
 }
+
+type Phase = 'streaming' | 'images' | 'done';
 
 export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => void }) {
   const [html, setHtml] = useState('');
   const [stats, setStats] = useState<StreamStats | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>('streaming');
+  const [imageCount, setImageCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,9 +48,25 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
           if (!eventLine || !dataLine) continue;
           const ev = eventLine.slice(6).trim();
           const data = JSON.parse(dataLine.slice(5).trim());
-          if (ev === 'delta') setHtml((prev) => prev + data.text);
-          else if (ev === 'done') setStats({ cost: data.cost, usage: data.usage });
-          else if (ev === 'error') setError(data.message);
+          if (ev === 'delta') {
+            setHtml((prev) => prev + data.text);
+          } else if (ev === 'images_started') {
+            setPhase('images');
+            setImageCount(data.count);
+          } else if (ev === 'images_done') {
+            setImageCount(data.count);
+          } else if (ev === 'done') {
+            setStats({
+              cost: data.cost,
+              usage: data.usage,
+              imagesInjected: data.imagesInjected,
+            });
+            // Final HTML has images injected — replace the streamed accumulation.
+            if (typeof data.html === 'string') setHtml(data.html);
+            setPhase('done');
+          } else if (ev === 'error') {
+            setError(data.message);
+          }
         }
       }
       onDone();
@@ -62,10 +83,16 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
   return (
     <div className="space-y-4">
       {error && <p className="text-red-600">{error}</p>}
+      {phase === 'images' && (
+        <p className="text-sm opacity-70">
+          Generating {imageCount} image{imageCount === 1 ? '' : 's'} via OpenRouter…
+        </p>
+      )}
       {stats && (
         <p className="text-sm opacity-70">
           Tokens in: {stats.usage.inputTokens} · cacheRead: {stats.usage.cacheReadTokens} · out:{' '}
           {stats.usage.outputTokens} · cost ${stats.cost.toFixed(3)}
+          {stats.imagesInjected ? ` · images: ${stats.imagesInjected}` : ''}
         </p>
       )}
       {html && (
