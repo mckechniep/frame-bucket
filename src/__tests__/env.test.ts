@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const FAKE_ANTHROPIC = 'sk-ant' + '-fake';
 const FAKE_NOTION_SECRET = 'secret' + '_fake';
 const FAKE_NOTION_NTN = 'ntn' + '_fake';
+const FAKE_OPENROUTER = 'sk-or' + '-fake';
 const BAD_PREFIX = 'badkey';
 
 describe('env', () => {
@@ -21,6 +22,7 @@ describe('env', () => {
     process.env.NOTION_DATA_SOURCE_LAYOUTS = 'b'.repeat(32);
     process.env.NOTION_DATA_SOURCE_INTERACTIONS = 'c'.repeat(32);
     process.env.NOTION_DATA_SOURCE_SYSTEMS = 'd'.repeat(32);
+    process.env.OPENROUTER_API_KEY = FAKE_OPENROUTER;
     process.env.ADMIN_SECRET = 'x'.repeat(20);
     delete process.env.VERCEL;
     delete process.env.BLOB_READ_WRITE_TOKEN;
@@ -45,6 +47,13 @@ describe('env', () => {
     process.env.ANTHROPIC_API_KEY = BAD_PREFIX;
 
     await expect(import('../env')).rejects.toThrow(/sk-ant-/);
+  });
+
+  it('throws when OPENROUTER_API_KEY has wrong prefix', async () => {
+    setValidEnv();
+    process.env.OPENROUTER_API_KEY = BAD_PREFIX;
+
+    await expect(import('../env')).rejects.toThrow(/sk-or-/);
   });
 
   it('throws when NOTION_API_KEY has wrong prefix', async () => {

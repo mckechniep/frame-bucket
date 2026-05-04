@@ -20,6 +20,7 @@ const EnvSchema = z
     NOTION_DATA_SOURCE_LAYOUTS: NotionId,
     NOTION_DATA_SOURCE_INTERACTIONS: NotionId,
     NOTION_DATA_SOURCE_SYSTEMS: NotionId,
+    OPENROUTER_API_KEY: z.string().regex(/^sk-or-/, 'OPENROUTER_API_KEY must start with sk-or-'),
     ADMIN_SECRET: z.string().min(16),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
     DAILY_COST_ALERT_USD: z.coerce.number().default(50),
