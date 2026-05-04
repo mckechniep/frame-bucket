@@ -42,11 +42,22 @@ You are producing a single self-contained HTML file. Every rule below is mandato
 - One `<h1>` per page. Heading hierarchy descends without skipping levels. (→ source: ui-design:visual-hierarchy)
 - Form controls have `<label htmlFor="...">` linked to `id`. Buttons are `<button type="...">`. Links go to URLs; buttons trigger actions. (→ source: rules/web/coding-style.md)
 
+## Navigation
+
+- Navigation must be usable at every viewport width. (→ source: rules/web/design-quality.md, interaction-design:feedback-patterns)
+- When primary nav links don't fit at narrow viewports, **provide an alternative pattern**: hamburger menu (button → overlay or off-canvas drawer), dropdown, or condensed icon row. **Never apply `display: none` to nav links without a working replacement** — hiding navigation breaks the page. (→ source: rules/web/design-quality.md)
+- Hamburger button must be a real `<button type="button">` with `aria-label` and `aria-expanded`. Toggling logic uses vanilla JS; the menu opens via class toggle plus `transform`/`opacity` animation only. (→ source: rules/web/coding-style.md)
+- Skip-to-main link is the first focusable element regardless of viewport. (→ source: rules/web/performance.md)
+
 ## Responsive
 
-- Mobile-first. Author the small-viewport layout first; layer up enhancements at breakpoints. (→ source: rules/web/coding-style.md)
+- **Mobile-first means base styles target the narrowest viewport.** Layer enhancements at `min-width` breakpoints. **Never** use `max-width`-only media queries to retrofit mobile onto a desktop-first design — that's desktop-first authoring, which inverts the discipline. (→ source: rules/web/coding-style.md)
 - Breakpoints: 640px, 1024px, 1440px. Use `min-width` media queries. (→ source: spec §7.3)
+- **Every section's content sits inside a container** with horizontal padding ≥ 1rem at all viewport widths. **Content never touches the viewport edge** — even when a section background bleeds full-width (via negative `margin-inline`), the content within still sits inside the gutter. Test at 320px, 375px, 1024px, 1440px, 1920px. (→ source: rules/web/coding-style.md, ui-design:layout-grid)
+- **Body text columns clamp to readable width** within sections. Apply `max-width: 65ch` (or similar) to prose blocks; without it, body text spans the entire grid column at wide viewports and becomes hard to read. (→ source: ui-design:type-system)
 - No fixed pixel widths on layout containers; use `max-width` with a `clamp()`-fluid inner. (→ source: rules/web/coding-style.md)
+- **Grid alignment caution**: `align-items: end` on a grid row with variable-height content makes shorter columns appear orphaned (their content sits at the bottom of the row with empty space above). Default to `align-items: start` unless deliberately bottom-aligning content of similar height. (→ source: ui-design:layout-grid)
+- **Verify each breakpoint visually** — a layout that "compiles" doesn't guarantee it composes. Specifically check: nav usable, no horizontal scroll, body text within readable column width, footer columns aligned, hero composition holds, images fit their cells.
 
 ## Accessibility (WCAG AA floor)
 

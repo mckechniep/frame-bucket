@@ -40,6 +40,7 @@ Subtle and material. Off-white tinting (`oklch(98% 0.005 80)` is a warm paper ne
 
 - **Grid discipline**: 12-column at large; collapses fluidly. The grid is a guide; breaking it on purpose is an editorial signal.
 - **Asymmetry**: Encouraged. Headlines that break out of the column. Images overlapping section edges. Captions floating in the margin. A heading that occupies 6 columns while its body sits in 4. (→ source: rules/web/design-quality.md)
+- **Asymmetric crashes stay inside the page container**: editorial moves like overflowing headlines, marginalia, and images-bleeding-past-section-edges happen _within_ the page-level container/gutter. They do not run to the viewport edge. The gutter is the page's frame; asymmetry plays inside that frame. At wide viewports especially (1440px+), generous container padding is what gives editorial layouts breathing room — let the page have shoulders. (→ source: ui-design:layout-grid, rules/web/coding-style.md)
 - **Layering**: Achieved through typography scale and image overlap, not through stacked cards or `box-shadow`. Editorial pages rarely use card-on-card stacking; depth comes from the type hierarchy and overlapping images.
 
 ## Rule Modulations (how base canon bends here)
