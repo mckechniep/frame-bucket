@@ -44,12 +44,18 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const streamResp = client.messages.stream({
-          model: request.model,
-          max_tokens: request.max_tokens,
-          system: request.system,
-          messages: request.messages,
-        });
+        // Wire the client's abort signal into the Anthropic SDK call. When the
+        // browser disconnects (page reload, useEffect cleanup, AbortController),
+        // the SDK stops consuming tokens — no more paying for abandoned streams.
+        const streamResp = client.messages.stream(
+          {
+            model: request.model,
+            max_tokens: request.max_tokens,
+            system: request.system,
+            messages: request.messages,
+          },
+          { signal: req.signal },
+        );
 
         for await (const chunk of streamResp) {
           if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
@@ -94,10 +100,20 @@ export async function POST(req: NextRequest) {
 
         send('done', { archiveId, usage, cost, imagesInjected: placeholderCount, html });
       } catch (err) {
+        // Client disconnects (page reload, abort) surface as AbortError.
+        // Don't save an archive or send 'done' — there's no client listening
+        // and the work was abandoned. Just close the controller cleanly.
+        if (err instanceof Error && (err.name === 'AbortError' || req.signal.aborted)) {
+          return;
+        }
         const message = err instanceof Error ? err.message : 'generation failed';
         send('error', { message });
       } finally {
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          // Already closed (client disconnected). Ignore.
+        }
       }
     },
   });

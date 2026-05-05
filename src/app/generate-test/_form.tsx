@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { Taxonomy, TaxonomyEntry, Recipe, Vibe } from '@/lib/types';
 import { StreamView } from './_stream-view';
 
@@ -35,6 +35,12 @@ export function GenerateTestForm({ taxonomy }: { taxonomy: Taxonomy }) {
     });
     setStreaming(true);
   }
+
+  // Stable callback — prevents StreamView's useEffect deps from invalidating
+  // every time the form re-renders. Without useCallback, every keystroke or
+  // dropdown change while streaming would re-fire the fetch and start ANOTHER
+  // billable Anthropic generation. (Bug observed in dev: 30+ runaway calls.)
+  const handleStreamDone = useCallback(() => setStreaming(false), []);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -111,7 +117,7 @@ export function GenerateTestForm({ taxonomy }: { taxonomy: Taxonomy }) {
       </div>
       <div>
         {recipe ? (
-          <StreamView recipe={recipe} onDone={() => setStreaming(false)} />
+          <StreamView recipe={recipe} onDone={handleStreamDone} />
         ) : (
           <p className="text-[var(--color-ink-muted)]">Fill the form and generate.</p>
         )}

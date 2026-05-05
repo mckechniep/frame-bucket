@@ -19,6 +19,12 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
 
   useEffect(() => {
     let cancelled = false;
+    // AbortController so cleanup actually cancels the in-flight fetch.
+    // Without this, a re-mount or unmount mid-stream would leave the server
+    // continuing to consume Anthropic tokens until completion — paying for
+    // abandoned generations. Defense-in-depth against the deps-thrash bug
+    // that triggered 30+ runaway calls during M2 validation.
+    const abort = new AbortController();
     async function run() {
       setHtml('');
       setError(null);
@@ -26,6 +32,7 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ recipe }),
+        signal: abort.signal,
       });
       if (!res.body) {
         setError('No response body');
@@ -72,11 +79,14 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
       onDone();
     }
     run().catch((err) => {
+      // AbortError on intentional cancel is expected — don't surface as error.
+      if (err instanceof Error && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'unknown error');
       onDone();
     });
     return () => {
       cancelled = true;
+      abort.abort();
     };
   }, [recipe, onDone]);
 
