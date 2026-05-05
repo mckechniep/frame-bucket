@@ -1,15 +1,26 @@
 import { z } from 'zod';
 
+// Notion accepts both 32-char hex and dashed-UUID forms for IDs. Validate
+// either, then normalize to un-dashed so downstream consumers see one format.
+const NotionId = z
+  .string()
+  .regex(
+    /^([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i,
+    'must be a 32-char hex ID or dashed UUID',
+  )
+  .transform((s) => s.replace(/-/g, ''));
+
 const EnvSchema = z
   .object({
     ANTHROPIC_API_KEY: z.string().regex(/^sk-ant-/, 'ANTHROPIC_API_KEY must start with sk-ant-'),
     NOTION_API_KEY: z
       .string()
       .regex(/^(secret_|ntn_)/, 'NOTION_API_KEY must start with secret_ or ntn_'),
-    NOTION_DATA_SOURCE_AESTHETICS: z.string().length(32),
-    NOTION_DATA_SOURCE_LAYOUTS: z.string().length(32),
-    NOTION_DATA_SOURCE_INTERACTIONS: z.string().length(32),
-    NOTION_DATA_SOURCE_SYSTEMS: z.string().length(32),
+    NOTION_DATA_SOURCE_AESTHETICS: NotionId,
+    NOTION_DATA_SOURCE_LAYOUTS: NotionId,
+    NOTION_DATA_SOURCE_INTERACTIONS: NotionId,
+    NOTION_DATA_SOURCE_SYSTEMS: NotionId,
+    OPENROUTER_API_KEY: z.string().regex(/^sk-or-/, 'OPENROUTER_API_KEY must start with sk-or-'),
     ADMIN_SECRET: z.string().min(16),
     BLOB_READ_WRITE_TOKEN: z.string().optional(),
     DAILY_COST_ALERT_USD: z.coerce.number().default(50),

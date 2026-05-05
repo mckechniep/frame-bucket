@@ -1,8 +1,24 @@
-export default function AdminPage() {
+import { cookies } from 'next/headers';
+import { AdminLogin } from './login';
+import { AdminSyncPanel } from './sync-panel';
+
+export default async function AdminPage() {
+  const jar = await cookies();
+  const token = jar.get('fb_admin')?.value;
+
+  if (!token || token !== process.env.ADMIN_SECRET) {
+    return (
+      <main className="p-8">
+        <h2 className="text-[var(--text-xl)] mb-4">Admin access</h2>
+        <AdminLogin />
+      </main>
+    );
+  }
+
   return (
     <main className="p-8">
-      <h1 className="text-[var(--text-2xl)]">Admin</h1>
-      <p className="mt-4 text-[var(--color-ink-muted)]">Stub for the M1 Notion sync panel.</p>
+      <h2 className="text-[var(--text-xl)] mb-4">Taxonomy sync</h2>
+      <AdminSyncPanel adminToken={token} />
     </main>
   );
 }
