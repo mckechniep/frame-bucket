@@ -99,7 +99,9 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
 
   return {
     model: 'claude-opus-4-7',
-    max_tokens: 16000,
+    // 32K covers verbose aesthetics (Editorial, Maximalist) without over-paying
+    // for compact ones. Hit during M2 validation: 16K truncated mid-document.
+    max_tokens: 32000,
     system,
     messages: [{ role: 'user', content: userContent }],
     stream: true,
