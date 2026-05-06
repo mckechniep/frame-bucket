@@ -6,6 +6,10 @@ const PROMPTS_ROOT = path.join(process.cwd(), 'src', 'lib', 'prompts');
 const CANON_ROOT = path.join(PROMPTS_ROOT, 'craft-canon');
 const AESTHETICS_ROOT = path.join(CANON_ROOT, 'aesthetics');
 
+export async function loadPosture(): Promise<string> {
+  return fs.readFile(path.join(CANON_ROOT, 'posture.md'), 'utf-8');
+}
+
 export async function loadBaseCanon(): Promise<string> {
   return fs.readFile(path.join(CANON_ROOT, 'base.md'), 'utf-8');
 }

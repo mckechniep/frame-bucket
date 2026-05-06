@@ -1,5 +1,5 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
-import { loadBaseCanon, loadOutputContract, loadAestheticOverride } from './loader';
+import { loadPosture, loadBaseCanon, loadOutputContract, loadAestheticOverride } from './loader';
 
 interface SystemBlock {
   type: 'text';
@@ -70,7 +70,11 @@ Obey the output contract strictly.
 Output ONLY the file. No commentary, no markdown fences, no explanations.`;
 
 export async function assembleGenerationRequest(recipe: Recipe): Promise<AnthropicRequest> {
-  const [baseCanon, outputContract] = await Promise.all([loadBaseCanon(), loadOutputContract()]);
+  const [posture, baseCanon, outputContract] = await Promise.all([
+    loadPosture(),
+    loadBaseCanon(),
+    loadOutputContract(),
+  ]);
   const override = recipe.aesthetic.hasOverride
     ? await loadAestheticOverride(recipe.aesthetic.id)
     : null;
@@ -82,7 +86,7 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
     },
     {
       type: 'text',
-      text: `## Craft Canon\n\n${baseCanon}\n\n## Generation Output Contract\n\n${outputContract}`,
+      text: `## Frontend Design Posture\n\n${posture}\n\n## Craft Canon\n\n${baseCanon}\n\n## Generation Output Contract\n\n${outputContract}`,
       cache_control: { type: 'ephemeral' },
     },
   ];
