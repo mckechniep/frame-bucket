@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Taxonomy, Vibe } from '@/lib/types';
 import type { RecommendationResult, RankedPick } from '@/lib/types/recommendation';
 
@@ -23,6 +23,11 @@ export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy 
   const [result, setResult] = useState<RecommendResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abort any in-flight request on unmount.
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   // Stable callback — prevents re-firing on form re-renders.
   // Even though recommendation is cheap (~$0.005), we still wire AbortController
   // to match the project pattern and avoid orphaned in-flight requests.
@@ -31,7 +36,9 @@ export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy 
     setResult(null);
     setError(null);
 
-    const abort = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+    const abort = abortRef.current;
     const brief = {
       projectName,
       industry,
