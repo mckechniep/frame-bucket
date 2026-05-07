@@ -50,7 +50,9 @@ Each `RankedPick` has this shape:
 
 **Top pick floor:** If any entry clearly fits the brief, the top pick's confidence is ≥ 0.65. A brief that clearly calls for Swiss precision or Editorial typography warrants 0.80–0.95 for the matching entry.
 
-**Low-confidence fallback:** If no aesthetic clearly fits the brief, return three picks with confidence ≤ 0.50. Do not force a 0.80 on a pick that is a guess. Low confidence is information; suppress it is not.
+**Low-confidence fallback:** If no aesthetic clearly fits the brief, return three picks with confidence ≤ 0.50. Do not force a 0.80 on a pick that is a guess. Low confidence is information; suppressing it is not. Report the genuine confidence level even when it's modest.
+
+**Moderate-fit range (0.55–0.70):** For briefs with a plausible-but-not-obvious fit — the aesthetic could work but the brief doesn't explicitly invite it — the top pick sits in 0.55–0.70. Push above 0.70 only when the brief explicitly names or signals the aesthetic's defining characteristics (e.g., "considered editorial typography" for Editorial, "maximum clarity, restraint" for Swiss).
 
 **Do not write "all options work."** Ranking implies elimination. The third pick exists because it is better than every option that did not appear. Treat every pick as a positive claim, not a hedge.
 
@@ -58,7 +60,7 @@ Each `RankedPick` has this shape:
 
 Each `reasoning` string is **1–2 sentences, brief-specific.** Reference the brief's industry, audience, mood, or named content — not the taxonomy entry's own description.
 
-**Bad:** `"Editorial is a magazine-style aesthetic with serif typography."` — this tells the model about the taxonomy entry, not about the brief.
+**Bad:** `"Editorial is a magazine-style aesthetic with serif typography."` — this describes the taxonomy entry, not the brief.
 
 **Good:** `"The architecture studio's emphasis on materiality and considered long-form project narratives calls for the typographic weight and asymmetric image treatment that Editorial handles well."` — this tells the model why this entry fits this brief.
 
@@ -72,7 +74,7 @@ The test: if you could copy the reasoning onto a different brief without changin
 - **No preamble or postamble** — no "Here is my recommendation:" before the `{`, no "Let me know if you'd like adjustments." after the `}`.
 - **No tied confidence scores** — every pick in a bucket has a unique confidence value.
 - **No "all options work" reasoning** — every reasoning string makes a specific claim about fit.
-- **entryId must match the taxonomy slug exactly** — the server validates against the taxonomy; an unrecognized slug is a hard error.
+- **entryId must match the taxonomy slug exactly** — the server validates against the taxonomy; an unrecognized slug is a hard error. The user message includes the full taxonomy as a list of entries with their `id`, name, and signals. Select `entryId` values ONLY from that list — never invent or infer slugs from training memory. An unrecognized slug is a hard error and the entire pick will be discarded.
 
 ## Worked Example
 
