@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ZodError } from 'zod';
 import { parseRecommendationResponse, RecommendationParseError } from '../parse';
 import type { Taxonomy, TaxonomyEntry } from '@/lib/types';
 
@@ -156,7 +157,7 @@ describe('parseRecommendationResponse', () => {
     const parseError = caught as RecommendationParseError;
     expect(parseError.name).toBe('RecommendationParseError');
     // cause should be the ZodError
-    expect(parseError.cause).toBeDefined();
+    expect(parseError.cause).toBeInstanceOf(ZodError);
   });
 
   // Test 4b — missing required field fails schema
