@@ -15,6 +15,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "gen": "tsx -r tsconfig-paths/register scripts/gen.ts",
+    "recommend": "tsx -r tsconfig-paths/register scripts/recommend.ts",
     "prepare": "husky"
   },
   "lint-staged": {
