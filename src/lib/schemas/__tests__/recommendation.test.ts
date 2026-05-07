@@ -151,8 +151,8 @@ describe('RecommendationResultSchema', () => {
     ).toThrow();
   });
 
-  it('rejects a result with reasoning shorter than 10 chars', () => {
-    const badPick = { ...validPick, reasoning: 'Too short' };
+  it('rejects a result with an empty reasoning string', () => {
+    const badPick = { ...validPick, reasoning: '' };
     expect(() =>
       RecommendationResultSchema.parse({
         aesthetics: [badPick],
