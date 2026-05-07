@@ -9,6 +9,10 @@ import { estimateCost } from '@/lib/cost';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export async function POST(req: NextRequest) {
   // 1. Parse body — surface malformed JSON before Zod validation
   let body: unknown;
@@ -40,7 +44,7 @@ export async function POST(req: NextRequest) {
     request = await assembleRecommendationRequest(brief, taxonomy);
   } catch (err) {
     return Response.json(
-      { error: 'server prompt config missing', detail: (err as Error).message },
+      { error: 'server prompt config missing', detail: errorMessage(err) },
       { status: 500 },
     );
   }
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
       return new Response(null, { status: 499 });
     }
     return Response.json(
-      { error: 'upstream model error', detail: (err as Error).message },
+      { error: 'upstream model error', detail: errorMessage(err) },
       { status: 502 },
     );
   }
