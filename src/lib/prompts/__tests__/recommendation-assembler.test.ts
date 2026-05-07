@@ -86,6 +86,13 @@ describe('assembleRecommendationRequest', () => {
     expect(content).not.toContain('private notes that should NOT appear');
   });
 
+  it('user message does NOT contain private taxonomy fields (shortDefinition, notionId, hasOverride)', async () => {
+    const req = await assembleRecommendationRequest(fixtureBrief, fixtureTaxonomy);
+    const content = req.messages[0]?.content ?? '';
+    expect(content).not.toContain('short def');
+    expect(content).not.toContain('notion-123');
+  });
+
   it('max_tokens is bounded at 4000', async () => {
     const req = await assembleRecommendationRequest(fixtureBrief, fixtureTaxonomy);
     expect(req.max_tokens).toBeLessThanOrEqual(4000);
