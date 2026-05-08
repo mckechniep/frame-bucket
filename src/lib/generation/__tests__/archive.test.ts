@@ -14,19 +14,21 @@ afterEach(async () => {
   await fs.rm(tmpDir, { recursive: true, force: true });
 });
 
+const baseRecord = {
+  recipeSummary: 'editorial + editorial-spread',
+  html: '<!DOCTYPE html><html></html>',
+  modelId: 'claude-opus-4-7',
+  inputTokens: 100,
+  outputTokens: 200,
+  cacheReadTokens: 40000,
+  cost: 0.05,
+  generatedAt: new Date().toISOString(),
+};
+
 describe('ArchiveStore', () => {
   it('saves a generation and reads it back', async () => {
     const s = new ArchiveStore(tmpDir);
-    const id = await s.save({
-      recipeSummary: 'editorial + editorial-spread',
-      html: '<!DOCTYPE html><html></html>',
-      modelId: 'claude-opus-4-7',
-      inputTokens: 100,
-      outputTokens: 200,
-      cacheReadTokens: 40000,
-      cost: 0.05,
-      generatedAt: new Date().toISOString(),
-    });
+    const id = await s.save(baseRecord);
     expect(id).toMatch(/^\d{8}-\d{6}-[a-f0-9]{4}$/);
     const r = await s.read(id);
     expect(r?.html).toContain('DOCTYPE');
@@ -37,5 +39,99 @@ describe('ArchiveStore', () => {
   it('returns null for unknown id', async () => {
     const s = new ArchiveStore(tmpDir);
     expect(await s.read('nope')).toBeNull();
+  });
+
+  describe('backward-compatible migration', () => {
+    it('loads an old meta.json without iterationRound or parentArtifactId and returns defaults', async () => {
+      // Write a legacy meta.json that lacks the new fields
+      const legacyId = '20240101-120000-abcd';
+      const legacyDir = path.join(tmpDir, legacyId);
+      await fs.mkdir(legacyDir, { recursive: true });
+      const legacyMeta = {
+        recipeSummary: 'editorial + editorial-spread',
+        html: '<!DOCTYPE html><html></html>',
+        modelId: 'claude-opus-4-7',
+        inputTokens: 100,
+        outputTokens: 200,
+        cacheReadTokens: 40000,
+        cost: 0.05,
+        generatedAt: '2024-01-01T12:00:00.000Z',
+      };
+      await fs.writeFile(
+        path.join(legacyDir, 'meta.json'),
+        JSON.stringify(legacyMeta, null, 2) + '\n',
+        'utf-8',
+      );
+      await fs.writeFile(path.join(legacyDir, 'index.html'), legacyMeta.html, 'utf-8');
+
+      const s = new ArchiveStore(tmpDir);
+      const r = await s.read(legacyId);
+
+      expect(r).not.toBeNull();
+      expect(r?.iterationRound).toBe(0);
+      expect(r?.parentArtifactId).toBeUndefined();
+    });
+  });
+
+  describe('parent artifact linking', () => {
+    it('persists parentArtifactId and iterationRound when saved', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save({
+        ...baseRecord,
+        parentArtifactId: 'parent-id-001',
+        iterationRound: 1,
+      });
+
+      const r = await s.read(id);
+      expect(r?.parentArtifactId).toBe('parent-id-001');
+      expect(r?.iterationRound).toBe(1);
+    });
+
+    it('defaults iterationRound to 0 when not provided', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save(baseRecord);
+      const r = await s.read(id);
+      expect(r?.iterationRound).toBe(0);
+    });
+
+    it('appends (iter N) to recipeSummary when iterationRound > 0', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save({ ...baseRecord, iterationRound: 2 });
+      const r = await s.read(id);
+      expect(r?.recipeSummary).toContain('(iter 2)');
+    });
+
+    it('does NOT append (iter N) to recipeSummary when iterationRound is 0', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save(baseRecord);
+      const r = await s.read(id);
+      expect(r?.recipeSummary).toBe('editorial + editorial-spread');
+    });
+  });
+
+  describe('getChildren', () => {
+    it('returns children sorted by iterationRound ascending', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const parentId = 'parent-abc';
+
+      // Save in non-sequential order: rounds 1, 3, 2
+      await s.save({ ...baseRecord, parentArtifactId: parentId, iterationRound: 1 });
+      await s.save({ ...baseRecord, parentArtifactId: parentId, iterationRound: 3 });
+      await s.save({ ...baseRecord, parentArtifactId: parentId, iterationRound: 2 });
+
+      const children = await s.getChildren(parentId);
+
+      expect(children).toHaveLength(3);
+      expect(children.map((c) => c.iterationRound)).toEqual([1, 2, 3]);
+    });
+
+    it('returns empty array when no children exist', async () => {
+      const s = new ArchiveStore(tmpDir);
+      // Save a non-related artifact
+      await s.save(baseRecord);
+
+      const children = await s.getChildren('no-such-parent');
+      expect(children).toHaveLength(0);
+    });
   });
 });

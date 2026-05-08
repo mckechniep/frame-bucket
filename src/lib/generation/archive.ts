@@ -11,6 +11,8 @@ export interface ArchiveRecord {
   cacheReadTokens: number;
   cost: number;
   generatedAt: string;
+  parentArtifactId?: string;
+  iterationRound: number;
 }
 
 function timestampId(): string {
@@ -28,14 +30,26 @@ function timestampId(): string {
 export class ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
-  async save(record: ArchiveRecord): Promise<string> {
+  async save(
+    record: Omit<ArchiveRecord, 'iterationRound'> & Partial<Pick<ArchiveRecord, 'iterationRound'>>,
+  ): Promise<string> {
+    const iterationRound = record.iterationRound ?? 0;
+    const recipeSummary =
+      iterationRound > 0
+        ? `${record.recipeSummary} (iter ${iterationRound})`
+        : record.recipeSummary;
+    const fullRecord: ArchiveRecord = {
+      ...record,
+      iterationRound,
+      recipeSummary,
+    };
     const id = timestampId();
     const dir = path.join(this.rootDir, id);
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, 'index.html'), record.html, 'utf-8');
+    await fs.writeFile(path.join(dir, 'index.html'), fullRecord.html, 'utf-8');
     await fs.writeFile(
       path.join(dir, 'meta.json'),
-      JSON.stringify(record, null, 2) + '\n',
+      JSON.stringify(fullRecord, null, 2) + '\n',
       'utf-8',
     );
     return id;
@@ -48,12 +62,47 @@ export class ArchiveStore {
         fs.readFile(path.join(dir, 'index.html'), 'utf-8'),
         fs.readFile(path.join(dir, 'meta.json'), 'utf-8'),
       ]);
-      const meta = JSON.parse(metaRaw) as ArchiveRecord;
+      const raw = JSON.parse(metaRaw) as Partial<ArchiveRecord>;
+      const meta: ArchiveRecord = {
+        ...raw,
+        recipeSummary: raw.recipeSummary ?? '',
+        html: raw.html ?? '',
+        modelId: raw.modelId ?? '',
+        inputTokens: raw.inputTokens ?? 0,
+        outputTokens: raw.outputTokens ?? 0,
+        cacheReadTokens: raw.cacheReadTokens ?? 0,
+        cost: raw.cost ?? 0,
+        generatedAt: raw.generatedAt ?? '',
+        iterationRound: raw.iterationRound ?? 0,
+        parentArtifactId: raw.parentArtifactId,
+      };
       return { ...meta, html };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw err;
     }
+  }
+
+  async getChildren(parentId: string): Promise<ArchiveRecord[]> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.rootDir);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw err;
+    }
+
+    const results: ArchiveRecord[] = [];
+    await Promise.all(
+      entries.map(async (entry) => {
+        const record = await this.read(entry);
+        if (record?.parentArtifactId === parentId) {
+          results.push(record);
+        }
+      }),
+    );
+
+    return results.sort((a, b) => a.iterationRound - b.iterationRound);
   }
 }
 
