@@ -72,7 +72,7 @@ export function StreamView({ recipe, onDone }: { recipe: Recipe; onDone: () => v
             if (typeof data.html === 'string') setHtml(data.html);
             setPhase('done');
           } else if (ev === 'error') {
-            setError(data.message);
+            setError(data.error);
           }
         }
       }

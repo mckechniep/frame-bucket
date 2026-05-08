@@ -9,6 +9,10 @@ import type { Recipe } from '@/lib/types';
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 interface UsageTracking {
   inputTokens: number;
   outputTokens: number;
@@ -98,7 +102,13 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         });
 
-        send('done', { archiveId, usage, cost, imagesInjected: placeholderCount, html });
+        send('done', {
+          artifactId: archiveId,
+          usage,
+          cost,
+          imagesInjected: placeholderCount,
+          html,
+        });
       } catch (err) {
         // Client disconnects (page reload, abort) surface as AbortError.
         // Don't save an archive or send 'done' — there's no client listening
@@ -106,8 +116,7 @@ export async function POST(req: NextRequest) {
         if (err instanceof Error && (err.name === 'AbortError' || req.signal.aborted)) {
           return;
         }
-        const message = err instanceof Error ? err.message : 'generation failed';
-        send('error', { message });
+        send('error', { error: errorMessage(err) });
       } finally {
         try {
           controller.close();
