@@ -1,7 +1,7 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
-import { loadPosture, loadBaseCanon, loadOutputContract, loadAestheticOverride } from './loader';
+import { loadCanonLayers } from './canon-layers';
 
-interface SystemBlock {
+export interface SystemBlock {
   type: 'text';
   text: string;
   cache_control?: { type: 'ephemeral' };
@@ -77,14 +77,7 @@ Obey the output contract strictly.
 Output ONLY the file. No commentary, no markdown fences, no explanations.`;
 
 export async function assembleGenerationRequest(recipe: Recipe): Promise<AnthropicRequest> {
-  const [posture, baseCanon, outputContract] = await Promise.all([
-    loadPosture(),
-    loadBaseCanon(),
-    loadOutputContract(),
-  ]);
-  const override = recipe.aesthetic.hasOverride
-    ? await loadAestheticOverride(recipe.aesthetic.id)
-    : null;
+  const layers = await loadCanonLayers(recipe);
 
   const system: SystemBlock[] = [
     {
@@ -93,15 +86,15 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
     },
     {
       type: 'text',
-      text: `## Frontend Design Posture\n\n${posture}\n\n## Craft Canon\n\n${baseCanon}\n\n## Generation Output Contract\n\n${outputContract}`,
+      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
       cache_control: { type: 'ephemeral' },
     },
   ];
 
-  if (override) {
+  if (layers.override) {
     system.push({
       type: 'text',
-      text: `## Aesthetic Override — ${recipe.aesthetic.name}\n\n${override}`,
+      text: `## Aesthetic Override — ${recipe.aesthetic.name}\n\n${layers.override}`,
       cache_control: { type: 'ephemeral' },
     });
   }
