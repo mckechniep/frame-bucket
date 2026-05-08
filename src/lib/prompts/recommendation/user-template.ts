@@ -29,8 +29,8 @@ export function formatTaxonomySummary(taxonomy: Taxonomy): string {
 /**
  * Formats the project brief as a markdown bullet list for the recommendation user message.
  * Output format: `- **Key:** value` lines (markdown bold labels).
- * A sibling `formatBrief` in `../assembler.ts` produces the same logical fields
- * as plain-text `Key: value` lines for the generation prompt.
+ * A sibling `formatBrief` in `../format-brief.ts` produces the same logical fields
+ * as plain-text `Key: value` lines for the generation and iteration prompts.
  * If the `Brief` shape changes, update both functions together.
  */
 export function formatBrief(brief: Brief): string {

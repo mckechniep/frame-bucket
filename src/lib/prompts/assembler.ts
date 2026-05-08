@@ -1,5 +1,6 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
 import { loadCanonLayers } from './canon-layers';
+import { formatBrief } from './format-brief';
 
 export interface SystemBlock {
   type: 'text';
@@ -24,26 +25,6 @@ function formatEntry(e: TaxonomyEntry): string {
     `- Best Use Case: ${e.bestUseCase}`,
     `- Distinctive Signals: ${e.distinctiveSignals.join('; ')}`,
     `- Notes: ${e.notes || '(none)'}`,
-  ].join('\n');
-}
-
-/**
- * Formats the project brief as plain text for the generation user message.
- * Output format: unadorned `Key: value` lines (no markdown bold).
- * A sibling `formatBrief` in `recommendation/user-template.ts` produces the
- * same logical fields with markdown-bold labels for the recommendation prompt.
- * If the `Brief` shape changes, update both functions together.
- */
-function formatBrief(brief: Recipe['brief']): string {
-  const vibe = brief.vibe === 'custom' ? (brief.customVibe ?? 'custom') : brief.vibe;
-  return [
-    `Project name: ${brief.projectName}`,
-    `Industry: ${brief.industry}`,
-    `Vibe: ${vibe}`,
-    brief.colorsProvided?.length
-      ? `Color hints: ${brief.colorsProvided.join(', ')}`
-      : 'Color hints: (none — you choose palette that serves the recipe)',
-    brief.description ? `Notes: ${brief.description}` : 'Notes: (none)',
   ].join('\n');
 }
 

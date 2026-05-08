@@ -1,25 +1,13 @@
 import type { IterationRequest } from '@/lib/types';
-import type { Recipe, Brief } from '@/lib/types/recipe';
+import type { Recipe } from '@/lib/types/recipe';
 import type { AnthropicRequest, SystemBlock } from './assembler';
 import { loadCanonLayers } from './canon-layers';
+import { formatBrief } from './format-brief';
 
 const ITERATION_DIRECTIVE =
   'Regenerate the full HTML, applying the feedback while preserving everything that works. ' +
   'Output the complete new HTML document, beginning with `<!DOCTYPE html>` and ending with `</html>`. ' +
   'No markdown fences, no commentary.';
-
-function formatBrief(brief: Brief): string {
-  const vibe = brief.vibe === 'custom' ? (brief.customVibe ?? 'custom') : brief.vibe;
-  return [
-    `Project name: ${brief.projectName}`,
-    `Industry: ${brief.industry}`,
-    `Vibe: ${vibe}`,
-    brief.colorsProvided?.length
-      ? `Color hints: ${brief.colorsProvided.join(', ')}`
-      : 'Color hints: (none — you choose palette that serves the recipe)',
-    brief.description ? `Notes: ${brief.description}` : 'Notes: (none)',
-  ].join('\n');
-}
 
 function formatRecipeSummary(recipe: Recipe): string {
   const parts = [
