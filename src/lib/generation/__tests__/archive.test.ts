@@ -107,6 +107,47 @@ describe('ArchiveStore', () => {
       const r = await s.read(id);
       expect(r?.recipeSummary).toBe('editorial + editorial-spread');
     });
+
+    it('strips existing (iter N) suffix before adding the new one on re-save', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save({
+        ...baseRecord,
+        recipeSummary: 'editorial + editorial-spread (iter 1)',
+        iterationRound: 2,
+      });
+      const r = await s.read(id);
+      expect(r?.recipeSummary).toBe('editorial + editorial-spread (iter 2)');
+    });
+  });
+
+  describe('read() type hardening', () => {
+    it('coerces a string iterationRound in meta.json to 0', async () => {
+      const corruptedId = '20240101-120000-beef';
+      const corruptedDir = path.join(tmpDir, corruptedId);
+      await fs.mkdir(corruptedDir, { recursive: true });
+      const corruptedMeta = {
+        recipeSummary: 'editorial + editorial-spread',
+        html: '<!DOCTYPE html><html></html>',
+        modelId: 'claude-opus-4-7',
+        inputTokens: 100,
+        outputTokens: 200,
+        cacheReadTokens: 40000,
+        cost: 0.05,
+        generatedAt: '2024-01-01T12:00:00.000Z',
+        iterationRound: '1',
+      };
+      await fs.writeFile(
+        path.join(corruptedDir, 'meta.json'),
+        JSON.stringify(corruptedMeta, null, 2) + '\n',
+        'utf-8',
+      );
+      await fs.writeFile(path.join(corruptedDir, 'index.html'), corruptedMeta.html, 'utf-8');
+
+      const s = new ArchiveStore(tmpDir);
+      const r = await s.read(corruptedId);
+      expect(r).not.toBeNull();
+      expect(r?.iterationRound).toBe(0);
+    });
   });
 
   describe('getChildren', () => {

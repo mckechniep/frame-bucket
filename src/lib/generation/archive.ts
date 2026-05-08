@@ -27,6 +27,10 @@ function timestampId(): string {
   return `${y}${mo}${d}-${h}${mi}${s}-${r}`;
 }
 
+function stripIterSuffix(summary: string): string {
+  return summary.replace(/\s*\(iter \d+\)\s*$/, '');
+}
+
 export class ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
@@ -34,10 +38,9 @@ export class ArchiveStore {
     record: Omit<ArchiveRecord, 'iterationRound'> & Partial<Pick<ArchiveRecord, 'iterationRound'>>,
   ): Promise<string> {
     const iterationRound = record.iterationRound ?? 0;
+    const baseSummary = stripIterSuffix(record.recipeSummary);
     const recipeSummary =
-      iterationRound > 0
-        ? `${record.recipeSummary} (iter ${iterationRound})`
-        : record.recipeSummary;
+      iterationRound > 0 ? `${baseSummary} (iter ${iterationRound})` : baseSummary;
     const fullRecord: ArchiveRecord = {
       ...record,
       iterationRound,
@@ -73,7 +76,7 @@ export class ArchiveStore {
         cacheReadTokens: raw.cacheReadTokens ?? 0,
         cost: raw.cost ?? 0,
         generatedAt: raw.generatedAt ?? '',
-        iterationRound: raw.iterationRound ?? 0,
+        iterationRound: typeof raw.iterationRound === 'number' ? raw.iterationRound : 0,
         parentArtifactId: raw.parentArtifactId,
       };
       return { ...meta, html };
