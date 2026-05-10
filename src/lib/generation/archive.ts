@@ -4,7 +4,19 @@ import crypto from 'node:crypto';
 
 export interface ArchiveRecord {
   recipeSummary: string;
+  /**
+   * Final HTML served to viewers — image placeholders have been replaced with
+   * inline base64 data URIs. Can be 10MB+ once images are injected.
+   */
   html: string;
+  /**
+   * Pre-injection HTML, with `src="OPENROUTER:<prompt>"` placeholders intact.
+   * This is the model's actual output, before injectImages bloats it. Used as
+   * the previous-HTML input for iteration so we don't ship megabytes of base64
+   * back to the API. Optional for backward compatibility with archives saved
+   * before the source-capture change landed.
+   */
+  htmlSource?: string;
   modelId: string;
   inputTokens: number;
   outputTokens: number;
@@ -50,6 +62,11 @@ export class ArchiveStore {
     const dir = path.join(this.rootDir, id);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, 'index.html'), fullRecord.html, 'utf-8');
+    if (fullRecord.htmlSource) {
+      await fs.writeFile(path.join(dir, 'index-source.html'), fullRecord.htmlSource, 'utf-8');
+    }
+    // meta.json keeps a copy of htmlSource too for ergonomic single-file reads;
+    // index-source.html is the human-friendly mirror.
     await fs.writeFile(
       path.join(dir, 'meta.json'),
       JSON.stringify(fullRecord, null, 2) + '\n',
@@ -70,6 +87,7 @@ export class ArchiveStore {
         ...raw,
         recipeSummary: raw.recipeSummary ?? '',
         html: raw.html ?? '',
+        htmlSource: typeof raw.htmlSource === 'string' ? raw.htmlSource : undefined,
         modelId: raw.modelId ?? '',
         inputTokens: raw.inputTokens ?? 0,
         outputTokens: raw.outputTokens ?? 0,
@@ -86,7 +104,7 @@ export class ArchiveStore {
     }
   }
 
-  async getChildren(parentId: string): Promise<ArchiveRecord[]> {
+  async getChildren(parentId: string): Promise<Array<ArchiveRecord & { id: string }>> {
     let entries: string[];
     try {
       entries = await fs.readdir(this.rootDir);
@@ -95,12 +113,12 @@ export class ArchiveStore {
       throw err;
     }
 
-    const results: ArchiveRecord[] = [];
+    const results: Array<ArchiveRecord & { id: string }> = [];
     await Promise.all(
       entries.map(async (entry) => {
         const record = await this.read(entry);
         if (record?.parentArtifactId === parentId) {
-          results.push(record);
+          results.push({ ...record, id: entry });
         }
       }),
     );

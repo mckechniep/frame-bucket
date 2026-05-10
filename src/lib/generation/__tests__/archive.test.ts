@@ -73,6 +73,33 @@ describe('ArchiveStore', () => {
     });
   });
 
+  describe('htmlSource (pre-injection HTML capture)', () => {
+    it('persists htmlSource as a separate file and round-trips it through read()', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save({
+        ...baseRecord,
+        html: '<!DOCTYPE html><html><body><img src="data:image/png;base64,XXX"></body></html>',
+        htmlSource: '<!DOCTYPE html><html><body><img src="OPENROUTER:loaf"></body></html>',
+      });
+
+      const indexSource = await fs.readFile(path.join(tmpDir, id, 'index-source.html'), 'utf-8');
+      expect(indexSource).toContain('OPENROUTER:loaf');
+
+      const r = await s.read(id);
+      expect(r?.htmlSource).toContain('OPENROUTER:loaf');
+      // html still holds the post-injection version
+      expect(r?.html).toContain('data:image/png;base64,');
+    });
+
+    it('omits index-source.html when htmlSource is not provided', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const id = await s.save(baseRecord);
+      await expect(fs.access(path.join(tmpDir, id, 'index-source.html'))).rejects.toThrow();
+      const r = await s.read(id);
+      expect(r?.htmlSource).toBeUndefined();
+    });
+  });
+
   describe('parent artifact linking', () => {
     it('persists parentArtifactId and iterationRound when saved', async () => {
       const s = new ArchiveStore(tmpDir);
@@ -164,6 +191,20 @@ describe('ArchiveStore', () => {
 
       expect(children).toHaveLength(3);
       expect(children.map((c) => c.iterationRound)).toEqual([1, 2, 3]);
+    });
+
+    it('attaches each child artifact id to the returned record', async () => {
+      const s = new ArchiveStore(tmpDir);
+      const parentId = 'parent-with-id';
+      const childId = await s.save({
+        ...baseRecord,
+        parentArtifactId: parentId,
+        iterationRound: 1,
+      });
+
+      const children = await s.getChildren(parentId);
+      expect(children).toHaveLength(1);
+      expect(children[0]?.id).toBe(childId);
     });
 
     it('returns empty array when no children exist', async () => {

@@ -6,13 +6,16 @@
  *
  * Usage:
  *   pnpm iterate <archive-id> "<feedback>"
+ *   pnpm iterate <archive-id> --feedback-file path/to/feedback.txt
  *   pnpm iterate <archive-id> "<feedback>" --brief-file path/to/brief.json
  *   pnpm iterate <archive-id> "<feedback>" --vibe scrappy-startup
  *
  * The aesthetic + layout pair is recovered from the parent archive's
  * recipeSummary (format: "<aestheticId> + <layoutId>", with any "(iter N)"
  * suffix stripped). The brief defaults to the Maple St Bakery brief used by
- * gen.ts/recommend.ts; override with --brief-file.
+ * gen.ts/recommend.ts; override with --brief-file. Feedback can come from a
+ * positional arg or from --feedback-file (avoids shell-escaping for long or
+ * punctuation-heavy feedback).
  *
  * Requires: synced data/taxonomy.json (run /admin sync first), real
  * ANTHROPIC_API_KEY in .env.local, and an existing artifact under
@@ -45,12 +48,15 @@ function parseArgs(): CliArgs {
   const args = process.argv.slice(2);
   const positional: string[] = [];
   let briefFile: string | undefined;
+  let feedbackFile: string | undefined;
   let vibe: Vibe | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--brief-file' && args[i + 1]) {
       briefFile = args[++i];
+    } else if (a === '--feedback-file' && args[i + 1]) {
+      feedbackFile = args[++i];
     } else if (a === '--vibe' && args[i + 1]) {
       vibe = args[++i] as Vibe;
     } else if (typeof a === 'string') {
@@ -58,15 +64,42 @@ function parseArgs(): CliArgs {
     }
   }
 
-  if (positional.length < 2) {
-    console.error('Usage: pnpm iterate <archive-id> "<feedback>" [--brief-file path] [--vibe v]');
+  const archiveId = positional[0];
+  if (!archiveId) {
+    console.error(
+      'Usage: pnpm iterate <archive-id> ("<feedback>" | --feedback-file path) [--brief-file path] [--vibe v]',
+    );
     process.exit(1);
   }
 
-  // Length check above guarantees these are defined; the cast keeps strict
-  // noUncheckedIndexedAccess happy without a runtime guard.
-  const [archiveId, feedback] = positional as [string, string];
+  let feedback = positional[1];
+  if (!feedback && feedbackFile) {
+    feedback = fs.readFileSync(path.resolve(feedbackFile), 'utf-8').trim();
+  }
+  if (!feedback) {
+    console.error('Feedback required. Provide as positional arg or via --feedback-file <path>.');
+    process.exit(1);
+  }
+
   return { archiveId, feedback, briefFile, vibe };
+}
+
+// Replaces inline base64 image data URIs with OPENROUTER: placeholders so the
+// previous-HTML payload sent to iteration stays under the model's context
+// window. Used as a fallback for legacy archives that pre-date htmlSource
+// capture; their original generation prompts are unrecoverable, so a generic
+// alt-text-derived placeholder is the best we can do. Lossy by design.
+function stripBase64Images(html: string): string {
+  return html.replace(/<img\b([^>]*)>/gi, (full, attrs: string) => {
+    if (!/\bsrc="data:image\//i.test(attrs)) return full;
+    const altMatch = attrs.match(/\balt="([^"]*)"/i);
+    const widthMatch = attrs.match(/\bwidth="(\d+)"/i);
+    const heightMatch = attrs.match(/\bheight="(\d+)"/i);
+    const alt = altMatch?.[1]?.trim() || 'image';
+    const w = widthMatch?.[1] ?? '1024';
+    const h = heightMatch?.[1] ?? '1024';
+    return `<img src="OPENROUTER:${alt}" alt="${alt}" width="${w}" height="${h}">`;
+  });
 }
 
 // Parses "editorial + editorial-spread" (or with a trailing "(iter N)"
@@ -147,9 +180,20 @@ async function main(): Promise<void> {
   const recipe: Recipe = { brief, aesthetic, layout };
   const childRound = parent.iterationRound + 1;
 
+  // Prefer the captured pre-injection HTML (small, has placeholders the model
+  // emitted). Fall back to a regex strip on legacy archives — lossy but the
+  // only way to fit them in the context window.
+  let previousHtml = parent.htmlSource;
+  if (!previousHtml) {
+    previousHtml = stripBase64Images(parent.html);
+    console.warn(
+      '[iterate] parent has no htmlSource; using regex-stripped HTML (image prompts will be generic).',
+    );
+  }
+
   const request = await assembleIterationRequest({
     recipe,
-    previousHtml: parent.html,
+    previousHtml,
     previousArtifactId: archiveId,
     feedback,
   });

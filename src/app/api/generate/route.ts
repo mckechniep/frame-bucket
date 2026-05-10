@@ -75,6 +75,8 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Snapshot model output BEFORE image injection — see gen.ts comment.
+        const htmlSource = html;
         // Inject images for any OPENROUTER: placeholder <img> tags.
         const placeholderCount = countImagePlaceholders(html);
         if (placeholderCount > 0) {
@@ -94,6 +96,7 @@ export async function POST(req: NextRequest) {
         const archiveId = await archive.save({
           recipeSummary: `${recipe.aesthetic.id} + ${recipe.layout.id}`,
           html,
+          htmlSource,
           modelId: request.model,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,

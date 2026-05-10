@@ -78,9 +78,17 @@ export async function POST(req: NextRequest) {
   // -------------------------------------------------------------------------
   // 4. Assemble Anthropic request
   // -------------------------------------------------------------------------
+  // The client passes its current view of previousHtml in the request body,
+  // but we override with the parent's stored htmlSource when available — that
+  // is the model's actual output (with OPENROUTER: placeholders) before image
+  // injection bloated it with multi-MB base64 data URIs. Falling through to
+  // the client-supplied HTML keeps the route working for legacy archives, at
+  // the (real) risk of blowing the context window for image-heavy parents.
+  const previousHtml = parent.htmlSource ?? request.previousHtml;
+
   let anthropicRequest: Awaited<ReturnType<typeof assembleIterationRequest>>;
   try {
-    anthropicRequest = await assembleIterationRequest(request);
+    anthropicRequest = await assembleIterationRequest({ ...request, previousHtml });
   } catch (err) {
     const detail = errorMessage(err);
     return Response.json({ error: 'server prompt config missing', detail }, { status: 500 });
@@ -133,6 +141,11 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Snapshot the model's actual output before injectImages — same
+        // architecture as /api/generate. Iteration on iteration must keep
+        // forwarding the placeholder version as previous-HTML, never the
+        // post-injection version.
+        const htmlSource = html;
         // Inject images for any OPENROUTER: placeholder <img> tags.
         const placeholderCount = countImagePlaceholders(html);
         if (placeholderCount > 0) {
@@ -154,6 +167,7 @@ export async function POST(req: NextRequest) {
         const artifactId = await archive.save({
           recipeSummary: parent.recipeSummary,
           html,
+          htmlSource,
           modelId: anthropicRequest.model,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
