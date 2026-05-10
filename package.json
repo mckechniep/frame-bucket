@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "gen": "tsx -r tsconfig-paths/register scripts/gen.ts",
     "recommend": "tsx -r tsconfig-paths/register scripts/recommend.ts",
+    "iterate": "tsx -r tsconfig-paths/register scripts/iterate.ts",
     "prepare": "husky"
   },
   "lint-staged": {
