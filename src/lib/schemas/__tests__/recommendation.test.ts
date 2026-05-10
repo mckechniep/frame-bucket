@@ -1,14 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import type { RankedPick, RecommendationResult } from '@/lib/types';
+import type { RankedPick, RecommendationModelOutput, RecommendationResult } from '@/lib/types';
 import type { z } from 'zod';
-import { BriefSchema, RankedPickSchema, RecommendationResultSchema } from '../recommendation';
+import {
+  BriefSchema,
+  RankedPickSchema,
+  RecommendationModelOutputSchema,
+  RecommendationResultSchema,
+} from '../recommendation';
 
 // ---------------------------------------------------------------------------
 // Type-level structural tests (compile-time only — no runtime cost)
 // ---------------------------------------------------------------------------
-// RankedPick and RecommendationResult should be structurally identical to
-// their schema-inferred counterparts. If these assignments fail to compile,
-// the types have diverged.
+// RankedPick, RecommendationModelOutput, and RecommendationResult should be
+// structurally identical to their schema-inferred counterparts. If these
+// assignments fail to compile, the types have diverged.
 //
 // NOTE: Brief → BriefSchema-inferred is intentionally NOT tested here.
 // BriefSchema makes `description` required (min 10) while the `Brief` type
@@ -23,6 +28,13 @@ type _RankedPickCheck =
       : never
     : never;
 
+type _ModelOutputCheck =
+  z.infer<typeof RecommendationModelOutputSchema> extends RecommendationModelOutput
+    ? RecommendationModelOutput extends z.infer<typeof RecommendationModelOutputSchema>
+      ? true
+      : never
+    : never;
+
 type _ResultCheck =
   z.infer<typeof RecommendationResultSchema> extends RecommendationResult
     ? RecommendationResult extends z.infer<typeof RecommendationResultSchema>
@@ -32,10 +44,12 @@ type _ResultCheck =
 
 // These const assertions will cause a TS error if the types diverge.
 const _pickOk: _RankedPickCheck = true;
+const _modelOutputOk: _ModelOutputCheck = true;
 const _resultOk: _ResultCheck = true;
 
 // Suppress "declared but never read" warnings.
 void _pickOk;
+void _modelOutputOk;
 void _resultOk;
 
 // ---------------------------------------------------------------------------
@@ -99,16 +113,60 @@ describe('BriefSchema', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// RecommendationResultSchema tests
-// ---------------------------------------------------------------------------
-
 const validPick: RankedPick = {
   entryId: 'editorial',
   entryName: 'Editorial',
   confidence: 0.92,
   reasoning: 'Strong type-led hierarchy matches the brand storytelling direction.',
 };
+
+// ---------------------------------------------------------------------------
+// RecommendationModelOutputSchema tests
+// ---------------------------------------------------------------------------
+// Validates the bare model-output shape — no generatedAt/model. This is what
+// Haiku is told to emit and what the parser validates against.
+
+describe('RecommendationModelOutputSchema', () => {
+  it('parses a valid model output with no metadata fields', () => {
+    const input: RecommendationModelOutput = {
+      aesthetics: [validPick],
+      layouts: [{ ...validPick, entryId: 'bento', entryName: 'Bento' }],
+      interactions: [],
+      systems: [],
+    };
+    expect(RecommendationModelOutputSchema.parse(input)).toEqual(input);
+  });
+
+  it('rejects a model output missing a bucket', () => {
+    expect(() =>
+      RecommendationModelOutputSchema.parse({
+        aesthetics: [validPick],
+        layouts: [],
+        interactions: [],
+        // systems intentionally absent
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a model output with unexpected metadata fields treated as required', () => {
+    // generatedAt/model in the model-output schema would fail .strict()-style
+    // checks if applied; this schema is intentionally non-strict (extra keys
+    // ignored), which mirrors Zod default behavior. The check here is that
+    // the schema does NOT require those fields.
+    const input = {
+      aesthetics: [validPick],
+      layouts: [],
+      interactions: [],
+      systems: [],
+      // No generatedAt, no model — should still parse cleanly.
+    };
+    expect(() => RecommendationModelOutputSchema.parse(input)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RecommendationResultSchema tests
+// ---------------------------------------------------------------------------
 
 describe('RecommendationResultSchema', () => {
   it('parses a valid recommendation result', () => {

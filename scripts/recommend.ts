@@ -112,7 +112,12 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const result = parseRecommendationResponse(textBlock.text, taxonomy);
+  const modelOutput = parseRecommendationResponse(textBlock.text, taxonomy);
+  const result = {
+    ...modelOutput,
+    generatedAt: new Date().toISOString(),
+    model: request.model,
+  };
 
   const buckets: Array<{ label: string; picks: typeof result.aesthetics }> = [
     { label: 'Aesthetics', picks: result.aesthetics },

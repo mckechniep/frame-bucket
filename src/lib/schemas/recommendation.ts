@@ -32,17 +32,28 @@ export const RankedPickSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// RecommendationResultSchema
+// RecommendationModelOutputSchema
 // ---------------------------------------------------------------------------
-// Each bucket array is capped at 5 to absorb model variance (top 3 expected).
-// Arrays may be empty — no `.min(1)` — since interactions/systems are
-// validly empty when the brief doesn't signal a need for them.
+// Shape Haiku is instructed to emit (system.md:23 — "The server fills in
+// generatedAt and model — do not emit those fields"). The recommendation
+// parser validates against THIS schema. Each bucket is capped at 5 to absorb
+// model variance; arrays may be empty.
 
-export const RecommendationResultSchema = z.object({
+export const RecommendationModelOutputSchema = z.object({
   aesthetics: z.array(RankedPickSchema).max(5),
   layouts: z.array(RankedPickSchema).max(5),
   interactions: z.array(RankedPickSchema).max(5),
   systems: z.array(RankedPickSchema).max(5),
+});
+
+// ---------------------------------------------------------------------------
+// RecommendationResultSchema
+// ---------------------------------------------------------------------------
+// The public envelope: model output enriched with server-side metadata.
+// `generatedAt` and `model` are filled in by the route handler / CLI after
+// the parser has validated the model output.
+
+export const RecommendationResultSchema = RecommendationModelOutputSchema.extend({
   generatedAt: z.string().datetime(),
   model: z.string().min(1),
 });
@@ -56,11 +67,13 @@ export const RecommendationResultSchema = z.object({
  * tests in this file's __tests__ prove identity). They use suffixed names
  * (`Input`, `Parsed`) to avoid colliding with the explicit interface names
  * when the schema file needs to import both. Consumers should prefer importing
- * `Brief`, `RankedPick`, `RecommendationResult` from `@/lib/types` for domain
- * use; reach for these inferred types only when working directly with the
- * Zod schemas (e.g., a parser that returns `z.infer<typeof Schema>`).
+ * `Brief`, `RankedPick`, `RecommendationResult`, `RecommendationModelOutput`
+ * from `@/lib/types` for domain use; reach for these inferred types only when
+ * working directly with the Zod schemas (e.g., a parser that returns
+ * `z.infer<typeof Schema>`).
  */
 
 export type BriefInput = z.infer<typeof BriefSchema>;
 export type RankedPickParsed = z.infer<typeof RankedPickSchema>;
+export type RecommendationModelOutputParsed = z.infer<typeof RecommendationModelOutputSchema>;
 export type RecommendationResultParsed = z.infer<typeof RecommendationResultSchema>;

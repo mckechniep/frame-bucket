@@ -1,19 +1,26 @@
 /**
  * Recommendation response parser.
  *
+ * The parser validates the *model output* shape (4 buckets only). The route
+ * handler / CLI wraps the result with `generatedAt` and `model` to produce a
+ * full `RecommendationResult`. This split keeps validation honest: the model
+ * is told (system.md:23) NOT to emit those metadata fields, so the schema
+ * the model is judged against shouldn't require them.
+ *
  * DESIGN DECISION — "validate, not enrich":
  * The M3 plan's "resolved" semantics were interpreted two ways:
  *   (a) return { entry: TaxonomyEntry, confidence, reasoning } enriched picks
  *   (b) validate that each entryId actually exists in the taxonomy, drop fakes
  *
- * We honour the explicit function signature — return type is `RecommendationResult`
- * (entryId + entryName, not a full TaxonomyEntry). The parser validates that each
- * entryId is real and drops invented ones with a warning. Consumers who need the
- * full TaxonomyEntry look it up via the taxonomy store using the validated entryId.
+ * We honour the explicit function signature — return type is
+ * `RecommendationModelOutput` (entryId + entryName, not a full TaxonomyEntry).
+ * The parser validates that each entryId is real and drops invented ones with
+ * a warning. Consumers who need the full TaxonomyEntry look it up via the
+ * taxonomy store using the validated entryId.
  */
 
-import { RecommendationResultSchema } from '@/lib/schemas/recommendation';
-import type { RecommendationResult } from '@/lib/types';
+import { RecommendationModelOutputSchema } from '@/lib/schemas/recommendation';
+import type { RecommendationModelOutput } from '@/lib/types';
 import type { Taxonomy } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -56,12 +63,13 @@ const BUCKETS = ['aesthetics', 'layouts', 'interactions', 'systems'] as const;
 type BucketKey = (typeof BUCKETS)[number];
 
 /**
- * Parse and validate Haiku's raw JSON response text into a `RecommendationResult`.
+ * Parse and validate Haiku's raw JSON response text into a
+ * `RecommendationModelOutput`.
  *
  * Steps:
  *  1. Strip markdown code fences.
  *  2. JSON.parse — throws RecommendationParseError on failure.
- *  3. Zod safeParse via RecommendationResultSchema — throws on failure.
+ *  3. Zod safeParse via RecommendationModelOutputSchema — throws on failure.
  *  4. For each pick in each bucket, verify the entryId exists in the taxonomy.
  *     Picks with invented entryIds are dropped with a console.warn; the rest
  *     of the result is preserved.
@@ -71,7 +79,7 @@ type BucketKey = (typeof BUCKETS)[number];
 export function parseRecommendationResponse(
   rawText: string,
   taxonomy: Taxonomy,
-): RecommendationResult {
+): RecommendationModelOutput {
   // Step 1 — strip fences and whitespace
   const stripped = stripFences(rawText);
 
@@ -93,8 +101,8 @@ export function parseRecommendationResponse(
     });
   }
 
-  // Step 3 — schema validation
-  const result = RecommendationResultSchema.safeParse(parsed);
+  // Step 3 — schema validation against the model output shape (no metadata)
+  const result = RecommendationModelOutputSchema.safeParse(parsed);
   if (!result.success) {
     throw new RecommendationParseError('Recommendation response failed schema validation', {
       cause: result.error,
@@ -113,7 +121,7 @@ export function parseRecommendationResponse(
     systems: new Set(taxonomy.systems.map((e) => e.id)),
   };
 
-  const filteredBuckets: Pick<RecommendationResult, BucketKey> = {
+  const filteredBuckets: RecommendationModelOutput = {
     aesthetics: [],
     layouts: [],
     interactions: [],
@@ -130,8 +138,5 @@ export function parseRecommendationResponse(
     }
   }
 
-  return {
-    ...validated,
-    ...filteredBuckets,
-  };
+  return filteredBuckets;
 }

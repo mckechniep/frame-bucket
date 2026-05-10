@@ -82,10 +82,11 @@ export async function POST(req: NextRequest) {
   }
   const rawText = textBlock.text;
 
-  // 7. Parse Haiku's JSON response into a RecommendationResult
-  let recommendation;
+  // 7. Parse Haiku's JSON response — model output shape only (no metadata).
+  //    Server fills in generatedAt + model below to produce the full envelope.
+  let modelOutput;
   try {
-    recommendation = parseRecommendationResponse(rawText, taxonomy);
+    modelOutput = parseRecommendationResponse(rawText, taxonomy);
   } catch (err) {
     if (err instanceof RecommendationParseError) {
       return Response.json(
@@ -98,6 +99,12 @@ export async function POST(req: NextRequest) {
     }
     throw err;
   }
+
+  const recommendation = {
+    ...modelOutput,
+    generatedAt: new Date().toISOString(),
+    model: request.model,
+  };
 
   // 8. Build usage + cost and return
   const usage = {

@@ -32,7 +32,12 @@ const taxonomy: Taxonomy = {
   systems: [makeEntry('sys-1', 'system')],
 };
 
-/** Minimal valid RecommendationResult payload as a plain object */
+/**
+ * Minimal valid model-output payload as a plain object — exactly the shape
+ * Haiku is instructed to emit (system.md:23). The parser validates this; the
+ * route/CLI wraps with `generatedAt` and `model` to produce a full
+ * `RecommendationResult`. Tests here therefore intentionally omit those keys.
+ */
 const validPayload = {
   aesthetics: [
     {
@@ -52,8 +57,6 @@ const validPayload = {
   ],
   interactions: [],
   systems: [],
-  generatedAt: '2024-06-01T12:00:00.000Z',
-  model: 'claude-haiku-4-5',
 };
 
 const validJson = JSON.stringify(validPayload);
@@ -77,8 +80,6 @@ describe('parseRecommendationResponse', () => {
     expect(result.layouts[0]!.entryId).toBe('lay-1');
     expect(result.interactions).toHaveLength(0);
     expect(result.systems).toHaveLength(0);
-    expect(result.model).toBe('claude-haiku-4-5');
-    expect(result.generatedAt).toBe('2024-06-01T12:00:00.000Z');
   });
 
   // Test 2 — markdown ```json fence variant
@@ -160,21 +161,19 @@ describe('parseRecommendationResponse', () => {
     expect(parseError.cause).toBeInstanceOf(ZodError);
   });
 
-  // Test 4b — missing required field fails schema
-  it('throws RecommendationParseError for JSON missing a required field', () => {
-    // Omit 'model' to produce a payload that fails schema validation
-    const withoutModel = {
+  // Test 4b — missing required bucket fails schema
+  it('throws RecommendationParseError for JSON missing a required bucket', () => {
+    // Omit 'systems' to produce a payload that fails schema validation
+    const withoutSystems = {
       aesthetics: validPayload.aesthetics,
       layouts: validPayload.layouts,
       interactions: validPayload.interactions,
-      systems: validPayload.systems,
-      generatedAt: validPayload.generatedAt,
-      // model intentionally absent
+      // systems intentionally absent
     };
 
     let caught: unknown;
     try {
-      parseRecommendationResponse(JSON.stringify(withoutModel), taxonomy);
+      parseRecommendationResponse(JSON.stringify(withoutSystems), taxonomy);
     } catch (err) {
       caught = err;
     }
@@ -221,8 +220,6 @@ describe('parseRecommendationResponse', () => {
       layouts: [],
       interactions: [],
       systems: [],
-      generatedAt: '2024-06-01T12:00:00.000Z',
-      model: 'claude-haiku-4-5',
     };
 
     const result = parseRecommendationResponse(JSON.stringify(emptyPayload), taxonomy);
