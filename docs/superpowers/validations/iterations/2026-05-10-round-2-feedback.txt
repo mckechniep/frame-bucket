@@ -1,0 +1,10 @@
+Stylistic shift, not a structural one. Right now the page reads as a polished magazine — beautiful but a touch cold and institutional, which doesn't match a family-run neighborhood bakery.
+
+Push the overall feel warmer and more lived-in:
+
+- Palette: lean into cream, honey, terracotta, and warm browns. Pull back on stark whites and pure black. Backgrounds can take a faint warm tint.
+- Typography mood: keep the serif body type and editorial discipline, but soften the display weights — less newspaper authority, more handwritten warmth around the edges (signatures, callouts, captions can lean even softer).
+- Photography mood: golden-hour lighting, warm cast, hands and people more than product-on-white. The image prompts should specify that warmth.
+- Texture: subtle grain or paper texture is welcome if it suits the palette shift.
+
+Preserve all structural decisions from round 1 — the letter-from-the-bench section stays single-column at every viewport, the masthead strip still collapses to "VII · No. 03 · Maple St" on narrow screens, and every section keeps its current order and content.

@@ -103,6 +103,11 @@ async function main(): Promise<void> {
   );
   console.log(`Cost: ${formatUsd(cost)}`);
 
+  // Snapshot the model's actual output BEFORE injectImages bloats it with
+  // base64 data URIs. We persist this as htmlSource so iteration can feed the
+  // model its own placeholders back without paying for megabytes of image
+  // payload in input tokens.
+  const htmlSource = html;
   const placeholderCount = countImagePlaceholders(html);
   if (placeholderCount > 0) {
     console.log(
@@ -117,6 +122,7 @@ async function main(): Promise<void> {
   const id = await archive.save({
     recipeSummary: `${aesthetic.id} + ${layout.id}`,
     html,
+    htmlSource,
     modelId: request.model,
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,

@@ -4,6 +4,7 @@ import { loadAestheticOverride } from '../loader';
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
 
 vi.mock('../loader', () => ({
+  loadPosture: vi.fn().mockResolvedValue('POSTURE CONTENT'),
   loadBaseCanon: vi.fn().mockResolvedValue('BASE CANON CONTENT'),
   loadOutputContract: vi.fn().mockResolvedValue('OUTPUT CONTRACT CONTENT'),
   loadAestheticOverride: vi.fn().mockResolvedValue('EDITORIAL OVERRIDE'),
@@ -56,6 +57,16 @@ describe('assembleGenerationRequest', () => {
     const userText = firstMessage?.content ?? '';
     expect(userText).toContain('Maple St Bakery');
     expect(userText).toContain('Editorial Spread');
+  });
+
+  it('prepends posture content into the same cached block as base canon', async () => {
+    const req = await assembleGenerationRequest(recipe);
+    const cachedBlock = req.system.find((b) => b.text.includes('BASE CANON CONTENT'));
+    expect(cachedBlock).toBeDefined();
+    expect(cachedBlock?.text).toContain('POSTURE CONTENT');
+    expect(cachedBlock?.text.indexOf('POSTURE CONTENT')).toBeLessThan(
+      cachedBlock?.text.indexOf('BASE CANON CONTENT') ?? Infinity,
+    );
   });
 
   it('omits aesthetic override block when aesthetic has no override', async () => {

@@ -1,0 +1,17 @@
+One element from round 2 is still untouched and now reads colder than everything around it: the hero typography line
+
+"Flour, salt,
+water, & the patience
+of a slow Tuesday."
+
+Round 2 warmed the palette, the photography, and the callout signatures, but this hero line is still set in the original heavy editorial-display weight — the same as the parent generation. Against the now-warmer page it reads as the loudest cold element.
+
+Soften specifically this line to match the rest of the warmed-up page:
+
+- Keep the line breaks intact (they read as poetry).
+- Shift the weight down a step — less newspaper-display authority, more like hand-set type with breathing room.
+- Set "patience" or "slow" in italic for warmth.
+- The ampersand can feel softer / less geometric — a more humanist or hand-set form.
+- Color can shift from pure black/ink to a warm deep brown or near-black with a brown undertone, matching the rest of the round-2 palette.
+
+Preserve everything else from round 2 — overall palette, photography mood, signature treatments, all the structural decisions from round 1 (single-column letter, masthead truncation), and every section's order and content.

@@ -4,13 +4,27 @@ import crypto from 'node:crypto';
 
 export interface ArchiveRecord {
   recipeSummary: string;
+  /**
+   * Final HTML served to viewers — image placeholders have been replaced with
+   * inline base64 data URIs. Can be 10MB+ once images are injected.
+   */
   html: string;
+  /**
+   * Pre-injection HTML, with `src="OPENROUTER:<prompt>"` placeholders intact.
+   * This is the model's actual output, before injectImages bloats it. Used as
+   * the previous-HTML input for iteration so we don't ship megabytes of base64
+   * back to the API. Optional for backward compatibility with archives saved
+   * before the source-capture change landed.
+   */
+  htmlSource?: string;
   modelId: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cost: number;
   generatedAt: string;
+  parentArtifactId?: string;
+  iterationRound: number;
 }
 
 function timestampId(): string {
@@ -25,17 +39,37 @@ function timestampId(): string {
   return `${y}${mo}${d}-${h}${mi}${s}-${r}`;
 }
 
+function stripIterSuffix(summary: string): string {
+  return summary.replace(/\s*\(iter \d+\)\s*$/, '');
+}
+
 export class ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
-  async save(record: ArchiveRecord): Promise<string> {
+  async save(
+    record: Omit<ArchiveRecord, 'iterationRound'> & Partial<Pick<ArchiveRecord, 'iterationRound'>>,
+  ): Promise<string> {
+    const iterationRound = record.iterationRound ?? 0;
+    const baseSummary = stripIterSuffix(record.recipeSummary);
+    const recipeSummary =
+      iterationRound > 0 ? `${baseSummary} (iter ${iterationRound})` : baseSummary;
+    const fullRecord: ArchiveRecord = {
+      ...record,
+      iterationRound,
+      recipeSummary,
+    };
     const id = timestampId();
     const dir = path.join(this.rootDir, id);
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(path.join(dir, 'index.html'), record.html, 'utf-8');
+    await fs.writeFile(path.join(dir, 'index.html'), fullRecord.html, 'utf-8');
+    if (fullRecord.htmlSource) {
+      await fs.writeFile(path.join(dir, 'index-source.html'), fullRecord.htmlSource, 'utf-8');
+    }
+    // meta.json keeps a copy of htmlSource too for ergonomic single-file reads;
+    // index-source.html is the human-friendly mirror.
     await fs.writeFile(
       path.join(dir, 'meta.json'),
-      JSON.stringify(record, null, 2) + '\n',
+      JSON.stringify(fullRecord, null, 2) + '\n',
       'utf-8',
     );
     return id;
@@ -48,12 +82,48 @@ export class ArchiveStore {
         fs.readFile(path.join(dir, 'index.html'), 'utf-8'),
         fs.readFile(path.join(dir, 'meta.json'), 'utf-8'),
       ]);
-      const meta = JSON.parse(metaRaw) as ArchiveRecord;
+      const raw = JSON.parse(metaRaw) as Partial<ArchiveRecord>;
+      const meta: ArchiveRecord = {
+        ...raw,
+        recipeSummary: raw.recipeSummary ?? '',
+        html: raw.html ?? '',
+        htmlSource: typeof raw.htmlSource === 'string' ? raw.htmlSource : undefined,
+        modelId: raw.modelId ?? '',
+        inputTokens: raw.inputTokens ?? 0,
+        outputTokens: raw.outputTokens ?? 0,
+        cacheReadTokens: raw.cacheReadTokens ?? 0,
+        cost: raw.cost ?? 0,
+        generatedAt: raw.generatedAt ?? '',
+        iterationRound: typeof raw.iterationRound === 'number' ? raw.iterationRound : 0,
+        parentArtifactId: raw.parentArtifactId,
+      };
       return { ...meta, html };
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw err;
     }
+  }
+
+  async getChildren(parentId: string): Promise<Array<ArchiveRecord & { id: string }>> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(this.rootDir);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
+      throw err;
+    }
+
+    const results: Array<ArchiveRecord & { id: string }> = [];
+    await Promise.all(
+      entries.map(async (entry) => {
+        const record = await this.read(entry);
+        if (record?.parentArtifactId === parentId) {
+          results.push({ ...record, id: entry });
+        }
+      }),
+    );
+
+    return results.sort((a, b) => a.iterationRound - b.iterationRound);
   }
 }
 

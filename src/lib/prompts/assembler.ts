@@ -1,7 +1,8 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
-import { loadBaseCanon, loadOutputContract, loadAestheticOverride } from './loader';
+import { loadCanonLayers } from './canon-layers';
+import { formatBrief } from './format-brief';
 
-interface SystemBlock {
+export interface SystemBlock {
   type: 'text';
   text: string;
   cache_control?: { type: 'ephemeral' };
@@ -24,19 +25,6 @@ function formatEntry(e: TaxonomyEntry): string {
     `- Best Use Case: ${e.bestUseCase}`,
     `- Distinctive Signals: ${e.distinctiveSignals.join('; ')}`,
     `- Notes: ${e.notes || '(none)'}`,
-  ].join('\n');
-}
-
-function formatBrief(brief: Recipe['brief']): string {
-  const vibe = brief.vibe === 'custom' ? (brief.customVibe ?? 'custom') : brief.vibe;
-  return [
-    `Project name: ${brief.projectName}`,
-    `Industry: ${brief.industry}`,
-    `Vibe: ${vibe}`,
-    brief.colorsProvided?.length
-      ? `Color hints: ${brief.colorsProvided.join(', ')}`
-      : 'Color hints: (none — you choose palette that serves the recipe)',
-    brief.description ? `Notes: ${brief.description}` : 'Notes: (none)',
   ].join('\n');
 }
 
@@ -70,10 +58,7 @@ Obey the output contract strictly.
 Output ONLY the file. No commentary, no markdown fences, no explanations.`;
 
 export async function assembleGenerationRequest(recipe: Recipe): Promise<AnthropicRequest> {
-  const [baseCanon, outputContract] = await Promise.all([loadBaseCanon(), loadOutputContract()]);
-  const override = recipe.aesthetic.hasOverride
-    ? await loadAestheticOverride(recipe.aesthetic.id)
-    : null;
+  const layers = await loadCanonLayers(recipe);
 
   const system: SystemBlock[] = [
     {
@@ -82,15 +67,15 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
     },
     {
       type: 'text',
-      text: `## Craft Canon\n\n${baseCanon}\n\n## Generation Output Contract\n\n${outputContract}`,
+      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
       cache_control: { type: 'ephemeral' },
     },
   ];
 
-  if (override) {
+  if (layers.override) {
     system.push({
       type: 'text',
-      text: `## Aesthetic Override — ${recipe.aesthetic.name}\n\n${override}`,
+      text: `## Aesthetic Override — ${recipe.aesthetic.name}\n\n${layers.override}`,
       cache_control: { type: 'ephemeral' },
     });
   }

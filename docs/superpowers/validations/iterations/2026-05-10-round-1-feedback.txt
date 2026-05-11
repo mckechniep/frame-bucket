@@ -1,0 +1,5 @@
+Two layout issues to fix.
+
+(1) On wider desktop viewports, the "letter from the bench" section splits its body text into 2 columns: the first paragraph sits alone in column 1 with a large block of dead space below it, then the rest of the letter is jammed into column 2. This looks broken. Keep the section single-column at all viewport widths, matching the mobile layout — the large feature element (signature/portrait/whatever sits there) first, then the full-width body text underneath it. Do not use CSS multi-column for this section.
+
+(2) The masthead metadata strip ("Volume VII · No. 03 Autumn Edition · Sixty-Two Years on Maple St") wraps awkwardly to 2 lines on narrower screens. On viewports under ~640px, collapse it to "VII · No. 03 · Maple St" so it fits on one line. Show the full strip on wider screens.
