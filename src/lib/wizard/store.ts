@@ -26,8 +26,8 @@ export interface WizardState {
 
 export interface WizardActions {
   setBrief: (brief: Brief) => void;
-  setRecommendation: (recommendation: RecommendationResult) => void;
-  setSelectedRecipe: (recipe: Recipe) => void;
+  setRecommendation: (recommendation: RecommendationResult | null) => void;
+  setSelectedRecipe: (recipe: Recipe | null) => void;
   appendRound: (round: WizardRound) => void;
   setActiveArtifactId: (id: string | null) => void;
   setCompareWithArtifactId: (id: string | null) => void;
