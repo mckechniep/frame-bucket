@@ -109,6 +109,23 @@ export function useGenerationStream(
       return res.body.getReader();
     });
 
+    // Throttled partial flush. Every srcDoc update tears down and re-parses
+    // the iframe document — that re-fetches every external resource
+    // (fonts, images) referenced inside the generated HTML. SSE deltas can
+    // fire many times a second, which would produce thousands of font
+    // requests over a 30s stream. We cap the flush rate at ~5 fps; the
+    // final `done` event still does a full unthrottled flush.
+    const FLUSH_INTERVAL_MS = 200;
+    let pendingTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastFlushAt = 0;
+
+    const cancelPendingFlush = () => {
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingTimer = null;
+      }
+    };
+
     promise
       .then(async (reader) => {
         if (cancelled) return;
@@ -122,9 +139,26 @@ export function useGenerationStream(
           setResult({ ...INITIAL_RESULT, phase: 'streaming' });
         }
 
+        const writePartial = () => {
+          if (cancelled) return;
+          lastFlushAt = Date.now();
+          setResult((prev) => ({ ...prev, phase, html: accHtml, imageCount }));
+        };
+
         const flushPartial = () => {
           if (cancelled) return;
-          setResult((prev) => ({ ...prev, phase, html: accHtml, imageCount }));
+          const now = Date.now();
+          const elapsed = now - lastFlushAt;
+          if (elapsed >= FLUSH_INTERVAL_MS) {
+            cancelPendingFlush();
+            writePartial();
+            return;
+          }
+          if (pendingTimer) return; // already scheduled
+          pendingTimer = setTimeout(() => {
+            pendingTimer = null;
+            writePartial();
+          }, FLUSH_INTERVAL_MS - elapsed);
         };
 
         while (!cancelled) {
@@ -155,6 +189,9 @@ export function useGenerationStream(
               const d = data as SSEDataDone;
               if (typeof d.html === 'string') accHtml = d.html;
               if (cancelled) return;
+              // Cancel any pending throttled flush — the done payload
+              // supersedes it with the final, image-injected HTML.
+              cancelPendingFlush();
               setResult({
                 phase: 'done',
                 html: accHtml,
@@ -168,6 +205,7 @@ export function useGenerationStream(
             } else if (ev === 'error') {
               const msg = (data.error as string) ?? 'stream error';
               if (cancelled) return;
+              cancelPendingFlush();
               setResult((prev) => ({ ...prev, phase: 'error', error: msg }));
             }
           }
@@ -182,6 +220,7 @@ export function useGenerationStream(
 
     return () => {
       cancelled = true;
+      cancelPendingFlush();
       release();
     };
     // `request` is captured at effect-run time and intentionally not in deps —
