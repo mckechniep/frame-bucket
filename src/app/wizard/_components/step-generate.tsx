@@ -6,8 +6,10 @@ import type { Recipe } from '@/lib/types';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
+import { IterationHistory } from './iteration-history';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
+import { SideBySidePreview } from './side-by-side-preview';
 
 const MAX_ROUNDS = 3;
 
@@ -35,6 +37,7 @@ export function StepGenerate() {
   const selectedRecipe = useWizardStore((s) => s.selectedRecipe);
   const rounds = useWizardStore((s) => s.rounds);
   const activeArtifactId = useWizardStore((s) => s.activeArtifactId);
+  const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
   const appendRound = useWizardStore((s) => s.appendRound);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
 
@@ -150,6 +153,16 @@ export function StepGenerate() {
   const showStoredPreview = !showLivePreview && !!previewArtifactId && stream.phase !== 'error';
   const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
+  // Side-by-side only fires when comparing AND the comparison target differs
+  // from the active artifact (otherwise we'd render the same iframe twice).
+  // Live streaming also suppresses comparison because the live preview is
+  // single-pane by design.
+  const showSideBySide =
+    !!compareWithArtifactId &&
+    !!previewArtifactId &&
+    compareWithArtifactId !== previewArtifactId &&
+    showStoredPreview;
+
   return (
     <section className="mx-auto max-w-[1400px] px-[var(--space-8)] py-[var(--space-12)]">
       <header className="mb-[var(--space-8)] flex flex-col gap-[var(--space-6)] sm:flex-row sm:items-start sm:justify-between">
@@ -173,51 +186,65 @@ export function StepGenerate() {
         isIteration={isIteration}
       />
 
-      <div className="mt-[var(--space-6)]">
-        {showLivePreview ? (
-          <iframe
-            key="live"
-            sandbox="allow-scripts"
-            srcDoc={stream.html}
-            className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-            title="Live generation preview"
-          />
-        ) : null}
+      <div
+        className={[
+          'mt-[var(--space-6)] gap-[var(--space-6)]',
+          hasExistingRound ? 'grid grid-cols-1 lg:grid-cols-[320px_1fr]' : 'block',
+        ].join(' ')}
+      >
+        {hasExistingRound ? <IterationHistory /> : null}
 
-        {showStoredPreview ? (
-          <iframe
-            key={previewArtifactId}
-            src={`/preview/${previewArtifactId}`}
-            sandbox="allow-scripts"
-            className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-            title="Generated artifact preview"
-          />
-        ) : null}
+        <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
+          {showLivePreview ? (
+            <iframe
+              key="live"
+              sandbox="allow-scripts"
+              srcDoc={stream.html}
+              className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
+              title="Live generation preview"
+            />
+          ) : null}
 
-        {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}
+          {showStoredPreview && showSideBySide && compareWithArtifactId && previewArtifactId ? (
+            <SideBySidePreview
+              activeArtifactId={previewArtifactId}
+              compareArtifactId={compareWithArtifactId}
+            />
+          ) : null}
 
-        {!showLivePreview && !showStoredPreview && !showError ? <PreparingPane /> : null}
-      </div>
+          {showStoredPreview && !showSideBySide && previewArtifactId ? (
+            <iframe
+              key={previewArtifactId}
+              src={`/preview/${previewArtifactId}`}
+              sandbox="allow-scripts"
+              className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
+              title="Generated artifact preview"
+            />
+          ) : null}
 
-      {stream.phase === 'done' && stream.usage ? (
-        <p className="mt-[var(--space-4)] font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          {stream.usage.inputTokens} in · {stream.usage.cacheReadTokens} cache ·{' '}
-          {stream.usage.outputTokens} out · ${(stream.cost ?? 0).toFixed(3)}
-          {stream.imagesInjected ? ` · ${stream.imagesInjected} images` : ''}
-        </p>
-      ) : null}
+          {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}
 
-      {hasExistingRound ? (
-        <div className="mt-[var(--space-8)]">
-          <RefinePanel
-            roundCount={currentRoundIndex}
-            maxRounds={MAX_ROUNDS}
-            disabled={isStreaming}
-            rateLimited={rateLimited}
-            onSubmit={handleRefine}
-          />
+          {!showLivePreview && !showStoredPreview && !showError ? <PreparingPane /> : null}
+
+          {stream.phase === 'done' && stream.usage ? (
+            <p className="font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
+              {stream.usage.inputTokens} in · {stream.usage.cacheReadTokens} cache ·{' '}
+              {stream.usage.outputTokens} out · ${(stream.cost ?? 0).toFixed(3)}
+              {stream.imagesInjected ? ` · ${stream.imagesInjected} images` : ''}
+            </p>
+          ) : null}
+
+          {hasExistingRound ? (
+            <RefinePanel
+              roundCount={currentRoundIndex}
+              maxRounds={MAX_ROUNDS}
+              disabled={isStreaming}
+              rateLimited={rateLimited}
+              onSubmit={handleRefine}
+            />
+          ) : null}
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }
