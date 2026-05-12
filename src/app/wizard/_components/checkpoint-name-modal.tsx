@@ -16,21 +16,30 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [name, setName] = useState(round.checkpointName ?? '');
 
-  // The <dialog> element is opened imperatively via showModal() to get
-  // backdrop dimming, focus trapping, and Esc-to-close for free. We mirror
-  // its native close event back to the parent so the parent can clear its
-  // "which round is being named" state.
+  // Keep the latest onClose accessible without including it in the open/close
+  // effect's deps. If we put `onClose` in deps, a new arrow function from the
+  // parent (which is the common case — `onClose={() => set...}`) would re-fire
+  // the effect, close the dialog, and reopen it, producing a visible flicker.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  // The <dialog> element is opened imperatively via showModal() so we get
+  // backdrop dimming, focus trapping, and Esc-to-close for free. The effect
+  // owns the dialog for the modal's React lifetime: open on mount, close on
+  // unmount. Empty deps ensure no mid-life re-fires.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (!dialog.open) dialog.showModal();
-    const handleClose = () => onClose();
+    const handleClose = () => onCloseRef.current();
     dialog.addEventListener('close', handleClose);
     return () => {
       dialog.removeEventListener('close', handleClose);
       if (dialog.open) dialog.close();
     };
-  }, [onClose]);
+  }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
