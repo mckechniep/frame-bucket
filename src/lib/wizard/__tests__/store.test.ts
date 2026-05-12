@@ -204,4 +204,65 @@ describe('wizard store', () => {
     expect(getWizardState()).toBe(useWizardStore.getState());
     expect(getWizardState().brief).toEqual(briefFixture);
   });
+
+  describe('hydrateAndValidate', () => {
+    test('drops rounds whose ids are missing from existingIds', async () => {
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-1' }));
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-2', iterationRound: 1 }));
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-3', iterationRound: 2 }));
+
+      const dropped = useWizardStore.getState().hydrateAndValidate(['a-1', 'a-3']);
+
+      expect(dropped).toBe(1);
+      expect(useWizardStore.getState().rounds.map((r) => r.artifactId)).toEqual(['a-1', 'a-3']);
+    });
+
+    test('returns 0 and is a no-op when nothing was dropped', async () => {
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-1' }));
+      useWizardStore.getState().setActiveArtifactId('a-1');
+
+      const dropped = useWizardStore.getState().hydrateAndValidate(['a-1', 'a-2']);
+
+      expect(dropped).toBe(0);
+      expect(useWizardStore.getState().rounds).toHaveLength(1);
+      expect(useWizardStore.getState().activeArtifactId).toBe('a-1');
+    });
+
+    test('falls activeArtifactId back to the latest survivor when its target was dropped', async () => {
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-1' }));
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-2', iterationRound: 1 }));
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-3', iterationRound: 2 }));
+      useWizardStore.getState().setActiveArtifactId('a-3');
+
+      useWizardStore.getState().hydrateAndValidate(['a-1', 'a-2']);
+
+      expect(useWizardStore.getState().activeArtifactId).toBe('a-2');
+    });
+
+    test('sets activeArtifactId to null when no rounds survive', async () => {
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-1' }));
+      useWizardStore.getState().setActiveArtifactId('a-1');
+
+      useWizardStore.getState().hydrateAndValidate([]);
+
+      expect(useWizardStore.getState().rounds).toEqual([]);
+      expect(useWizardStore.getState().activeArtifactId).toBeNull();
+    });
+
+    test('clears compareWithArtifactId when its target was dropped', async () => {
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-1' }));
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-2', iterationRound: 1 }));
+      useWizardStore.getState().setActiveArtifactId('a-2');
+      useWizardStore.getState().setCompareWithArtifactId('a-1');
+
+      useWizardStore.getState().hydrateAndValidate(['a-2']);
+
+      expect(useWizardStore.getState().compareWithArtifactId).toBeNull();
+    });
+  });
 });

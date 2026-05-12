@@ -3,6 +3,7 @@ import {
   WizardProgressBar,
   WizardStartOver,
 } from './_components/progress-bar';
+import { WizardHydrator } from './_components/wizard-hydrator';
 
 export default function WizardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
       <main className="flex-1">{children}</main>
+      <WizardHydrator />
       <footer className="border-t border-[var(--color-border)]">
         <div className="mx-auto max-w-[1400px] px-[var(--space-8)] py-[var(--space-4)]">
           <WizardAdvancedLinks />

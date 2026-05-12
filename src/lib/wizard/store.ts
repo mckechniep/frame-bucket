@@ -32,6 +32,18 @@ export interface WizardActions {
   setActiveArtifactId: (id: string | null) => void;
   setCompareWithArtifactId: (id: string | null) => void;
   setCheckpointName: (artifactId: string, name: string | undefined) => void;
+  /**
+   * Drop persisted rounds whose artifactIds aren't in `existingIds`. Called
+   * once per session after Zustand persist hydrates from localStorage, with
+   * the result of /api/artifact/exists. Returns the number of dropped rounds
+   * so the caller can surface a one-time notice.
+   *
+   * Side effects:
+   *  - rounds: filtered to existingIds
+   *  - activeArtifactId: falls back to the latest remaining round (or null)
+   *  - compareWithArtifactId: cleared if its target was dropped
+   */
+  hydrateAndValidate: (existingIds: string[]) => number;
   reset: () => void;
 }
 
@@ -46,7 +58,7 @@ const initialState: WizardState = {
 
 export const useWizardStore = create<WizardState & WizardActions>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialState,
 
       setBrief: (brief) => set({ brief }),
@@ -76,6 +88,29 @@ export const useWizardStore = create<WizardState & WizardActions>()(
             return { ...round, checkpointName: trimmed };
           }),
         })),
+
+      hydrateAndValidate: (existingIds) => {
+        const existing = new Set(existingIds);
+        const state = get();
+        const survivingRounds = state.rounds.filter((r) => existing.has(r.artifactId));
+        const droppedCount = state.rounds.length - survivingRounds.length;
+        if (droppedCount === 0) return 0;
+
+        const latestSurvivor = survivingRounds[survivingRounds.length - 1] ?? null;
+        const activeStillValid =
+          state.activeArtifactId !== null && existing.has(state.activeArtifactId);
+        const compareStillValid =
+          state.compareWithArtifactId !== null && existing.has(state.compareWithArtifactId);
+
+        set({
+          rounds: survivingRounds,
+          activeArtifactId: activeStillValid
+            ? state.activeArtifactId
+            : (latestSurvivor?.artifactId ?? null),
+          compareWithArtifactId: compareStillValid ? state.compareWithArtifactId : null,
+        });
+        return droppedCount;
+      },
 
       reset: () => set({ ...initialState }),
     }),
