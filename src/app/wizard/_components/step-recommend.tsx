@@ -73,8 +73,23 @@ export function StepRecommend({ taxonomy }: StepRecommendProps) {
           signal,
         });
         if (!res.ok) {
-          const text = await res.text().catch(() => res.statusText);
-          throw new Error(`${res.status} — ${text}`);
+          // The route returns structured error JSON: { error, detail?, issues? }
+          // Surface detail + issues if present so the error pane is diagnosable
+          // without inspecting raw 500-char model output.
+          const body = (await res.json().catch(() => null)) as {
+            error?: string;
+            detail?: string;
+            issues?: Array<{ path: string; message: string }>;
+          } | null;
+          const parts: string[] = [];
+          if (body?.detail) parts.push(body.detail);
+          if (body?.issues && body.issues.length > 0) {
+            parts.push(
+              'Issues: ' + body.issues.map((i) => `${i.path || '<root>'}: ${i.message}`).join('; '),
+            );
+          }
+          const message = parts.length > 0 ? parts.join(' — ') : (body?.error ?? res.statusText);
+          throw new Error(`${res.status} — ${message}`);
         }
         return res.json() as Promise<RecommendResponse>;
       },

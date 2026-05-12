@@ -26,9 +26,13 @@ export const RankedPickSchema = z.object({
   entryId: z.string().min(1),
   entryName: z.string().min(1),
   confidence: z.number().min(0).max(1),
-  // 300 chars ≈ 2 tight sentences; enforces the "1–2 sentence" discipline the
-  // system prompt (Task 3) will specify. Schema-level enforcement of UX intent.
-  reasoning: z.string().min(10).max(300),
+  // 1200 chars ≈ ~4 long sentences. The system prompt asks for 1–2 sentences
+  // around 300 chars, but Haiku's adherence to that soft target drifts on
+  // emotional or layered briefs (e.g., "warmth, safety, calm" → ~410 chars).
+  // The schema's job is to reject malformed responses, not enforce prose
+  // style — so the cap is set generously above the worst observed overshoot,
+  // and discipline is left to the system prompt.
+  reasoning: z.string().min(10).max(1200),
 });
 
 // ---------------------------------------------------------------------------

@@ -38,7 +38,7 @@ Each `RankedPick` has this shape:
   "entryId": string,    // taxonomy slug, e.g. "editorial"
   "entryName": string,  // human name, e.g. "Editorial"
   "confidence": number, // 0.0–1.0, two decimal places
-  "reasoning": string   // 10–300 chars, 1–2 sentences, brief-specific
+  "reasoning": string   // ~10–300 chars target (1200 hard cap), 1–2 sentences, brief-specific
 }
 ```
 
@@ -66,7 +66,7 @@ Each `reasoning` string is **1–2 sentences, brief-specific.** Reference the br
 
 The test: if you could copy the reasoning onto a different brief without changing a word, it is too generic. Rewrite it.
 
-**Character budget:** 10–300 characters. Two sentences that earn their length beat one sentence padded to fill space.
+**Character budget:** Aim for 10–300 characters. The schema accepts up to 1200 as a safety margin, but staying under 300 keeps the UI dense. Two sentences that earn their length beat one sentence padded to fill space.
 
 ## Output Discipline
 
