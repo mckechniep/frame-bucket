@@ -25,11 +25,13 @@ export function WizardProgressBar() {
   const currentStep = deriveCurrentStep(pathname);
   const currentIndex = currentStep ? STEPS.indexOf(currentStep) : -1;
 
-  const { brief, recommendation, selectedRecipe } = useWizardStore((s) => ({
-    brief: s.brief,
-    recommendation: s.recommendation,
-    selectedRecipe: s.selectedRecipe,
-  }));
+  // Individual selectors — Zustand v5 uses Object.is equality, so returning a
+  // fresh object literal from a selector triggers an infinite-loop warning
+  // from useSyncExternalStore on every render. Selecting each slot separately
+  // keeps the references stable.
+  const brief = useWizardStore((s) => s.brief);
+  const recommendation = useWizardStore((s) => s.recommendation);
+  const selectedRecipe = useWizardStore((s) => s.selectedRecipe);
 
   function handleStepClick(step: Step) {
     if (!canEnterStep(step, { brief, recommendation, selectedRecipe })) return;
