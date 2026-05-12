@@ -8,10 +8,15 @@ import { RecipeSchema } from './recipe';
 // Feedback is bounded 10–1000 chars to enforce concision: feedback longer
 // than 1 000 chars is a signal the user wants a full regeneration, not an
 // incremental iteration.
+//
+// `previousHtml` is optional — the route resolves the parent HTML from the
+// archive via `previousArtifactId`. Accepting an HTML payload on the wire is
+// a token-bomb risk; we keep the field optional for the `iterate.ts` CLI
+// path that still passes it explicitly, but the wizard never sends it.
 
 export const IterationRequestSchema = z.object({
   recipe: RecipeSchema,
-  previousHtml: z.string().min(1),
+  previousHtml: z.string().optional(),
   previousArtifactId: z.string().min(1),
   feedback: z.string().min(10).max(1000),
 });

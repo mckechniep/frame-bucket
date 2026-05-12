@@ -65,9 +65,11 @@ export function StreamView({ request, onDone, onRateLimited, onError }: StreamVi
     if (request.kind === 'generate') {
       body = { recipe: request.recipe };
     } else {
+      // Rule 1: do not send previousHtml. The route reads parent.htmlSource
+      // from the archive via previousArtifactId. Sending the rendered HTML
+      // would blow the wire budget on multi-MB post-injection artifacts.
       body = {
         recipe: request.recipe,
-        previousHtml: request.previousHtml,
         previousArtifactId: request.previousArtifactId,
         feedback: request.feedback,
       };

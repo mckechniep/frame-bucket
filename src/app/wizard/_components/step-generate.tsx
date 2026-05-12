@@ -1,12 +1,15 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { Recipe } from '@/lib/types';
 import { useWizardStore } from '@/lib/wizard/store';
 
-import { useGenerationStream } from '../_hooks/use-generation-stream';
+import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
 import { RecipeSummaryChip } from './recipe-summary';
+import { RefinePanel } from './refine-panel';
+
+const MAX_ROUNDS = 3;
 
 function recipeFingerprint(recipe: Recipe): string {
   return JSON.stringify({
@@ -18,6 +21,16 @@ function recipeFingerprint(recipe: Recipe): string {
   });
 }
 
+interface IterateOverride {
+  runKey: string;
+  request: GenerationStreamRequest;
+}
+
+interface IterationContext {
+  parentArtifactId: string;
+  parentRound: number;
+}
+
 export function StepGenerate() {
   const selectedRecipe = useWizardStore((s) => s.selectedRecipe);
   const rounds = useWizardStore((s) => s.rounds);
@@ -25,43 +38,70 @@ export function StepGenerate() {
   const appendRound = useWizardStore((s) => s.appendRound);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
 
-  // Has any round been generated yet for this recipe? Existing rounds short-
-  // circuit the auto-generate effect so re-entering the step never re-spends
-  // tokens on a result we already have.
   const hasExistingRound = rounds.length > 0;
 
-  // Stable primitive fingerprint of the recipe — used as the dedup key and
-  // as the effect dep (Rule 2: primitives only).
   const recipeKey = useMemo(
     () => (selectedRecipe ? recipeFingerprint(selectedRecipe) : ''),
     [selectedRecipe],
   );
 
-  const runKey = hasExistingRound || !recipeKey ? '' : recipeKey;
-
-  const streamRequest = useMemo(
-    () => (selectedRecipe ? { kind: 'generate' as const, recipe: selectedRecipe } : null),
-    [selectedRecipe],
+  // Initial generate fires once on entry, when no rounds exist yet.
+  const initialRunKey = hasExistingRound || !recipeKey ? '' : recipeKey;
+  const initialRequest = useMemo<GenerationStreamRequest | null>(
+    () =>
+      selectedRecipe && !hasExistingRound ? { kind: 'generate', recipe: selectedRecipe } : null,
+    [selectedRecipe, hasExistingRound],
   );
 
-  const stream = useGenerationStream(streamRequest, runKey);
+  // Iterate runs override the initial generate. Each Refine click bumps the
+  // runKey to a fresh value so the dedup cache treats it as a new request.
+  const [iterateOverride, setIterateOverride] = useState<IterateOverride | null>(null);
 
-  // When the stream completes, persist the round to the store. Guards
-  // against double-append if the effect re-runs (StrictMode, navigation
-  // round-trip) by checking the round set.
+  // The parent metadata for the in-flight iteration. Lives in a ref because
+  // it's set in an event handler and consumed in the done-effect — using
+  // useState would force a setState inside the effect's success branch,
+  // which the React lint rule rejects. Refs are the right fit: write where
+  // appropriate, read on completion, clear after consumption.
+  const iterationContextRef = useRef<IterationContext | null>(null);
+
+  const activeRunKey = iterateOverride?.runKey ?? initialRunKey;
+  const activeRequest = iterateOverride?.request ?? initialRequest;
+  const isIteration = activeRunKey.startsWith('iterate:');
+
+  const stream = useGenerationStream(activeRequest, activeRunKey);
+
+  // Persist completed rounds to the store. Guards against double-append on
+  // re-entry / StrictMode by checking the round set.
   useEffect(() => {
     if (stream.phase !== 'done') return;
     if (!stream.artifactId) return;
     if (rounds.some((r) => r.artifactId === stream.artifactId)) return;
     if (!selectedRecipe) return;
-    appendRound({
-      artifactId: stream.artifactId,
-      parentArtifactId: null,
-      iterationRound: 0,
-      recipeSummary: `${selectedRecipe.aesthetic.name} × ${selectedRecipe.layout.name}`,
-      cost: stream.cost ?? 0,
-      generatedAt: new Date().toISOString(),
-    });
+
+    const baseRecipe = `${selectedRecipe.aesthetic.name} × ${selectedRecipe.layout.name}`;
+    const iterationCtx = iterationContextRef.current;
+
+    if (iterationCtx) {
+      const nextRound = iterationCtx.parentRound + 1;
+      appendRound({
+        artifactId: stream.artifactId,
+        parentArtifactId: iterationCtx.parentArtifactId,
+        iterationRound: nextRound,
+        recipeSummary: `${baseRecipe} (iter ${nextRound})`,
+        cost: stream.cost ?? 0,
+        generatedAt: new Date().toISOString(),
+      });
+      iterationContextRef.current = null;
+    } else {
+      appendRound({
+        artifactId: stream.artifactId,
+        parentArtifactId: null,
+        iterationRound: 0,
+        recipeSummary: baseRecipe,
+        cost: stream.cost ?? 0,
+        generatedAt: new Date().toISOString(),
+      });
+    }
     setActiveArtifactId(stream.artifactId);
   }, [
     stream.phase,
@@ -73,14 +113,42 @@ export function StepGenerate() {
     setActiveArtifactId,
   ]);
 
-  // Decide what the preview pane shows:
-  //  - Live iframe (srcDoc) while streaming or compositing images
-  //  - Stable /preview/<id> iframe once a round exists in the store
-  //  - Error pane on failure
-  const showLivePreview = stream.phase === 'streaming' || stream.phase === 'images';
-  const previewArtifactId =
-    activeArtifactId ?? (rounds.length > 0 ? rounds[rounds.length - 1]?.artifactId : null) ?? null;
+  const handleRefine = useCallback(
+    (feedback: string) => {
+      if (!selectedRecipe) return;
+      const latest = rounds[rounds.length - 1];
+      if (!latest) return;
+      if (latest.iterationRound >= MAX_ROUNDS) return;
+
+      // Parent metadata is captured here at submit time and threaded to the
+      // done-effect via the ref. Each iteration overwrites the ref; the
+      // done-effect clears it once the round is appended.
+      iterationContextRef.current = {
+        parentArtifactId: latest.artifactId,
+        parentRound: latest.iterationRound,
+      };
+      setIterateOverride({
+        runKey: `iterate:${latest.artifactId}:${Date.now()}`,
+        request: {
+          kind: 'iterate',
+          recipe: selectedRecipe,
+          previousArtifactId: latest.artifactId,
+          feedback,
+        },
+      });
+    },
+    [selectedRecipe, rounds],
+  );
+
+  const latestRound = rounds[rounds.length - 1];
+  const currentRoundIndex = latestRound?.iterationRound ?? 0;
+  const isStreaming = stream.phase === 'streaming' || stream.phase === 'images';
+  const rateLimited = stream.phase === 'error' && !!stream.error?.startsWith('429');
+
+  const showLivePreview = isStreaming;
+  const previewArtifactId = activeArtifactId ?? latestRound?.artifactId ?? null;
   const showStoredPreview = !showLivePreview && !!previewArtifactId && stream.phase !== 'error';
+  const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
   return (
     <section className="mx-auto max-w-[1400px] px-[var(--space-8)] py-[var(--space-12)]">
@@ -98,7 +166,12 @@ export function StepGenerate() {
         </div>
       </header>
 
-      <StreamStatus stream={stream} hasExistingRound={hasExistingRound} />
+      <StreamStatus
+        phase={stream.phase}
+        imageCount={stream.imageCount}
+        hasExistingRound={hasExistingRound}
+        isIteration={isIteration}
+      />
 
       <div className="mt-[var(--space-6)]">
         {showLivePreview ? (
@@ -121,13 +194,9 @@ export function StepGenerate() {
           />
         ) : null}
 
-        {stream.phase === 'error' && !showStoredPreview ? (
-          <ErrorPane message={stream.error ?? 'unknown error'} />
-        ) : null}
+        {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}
 
-        {!showLivePreview && !showStoredPreview && stream.phase !== 'error' ? (
-          <PreparingPane />
-        ) : null}
+        {!showLivePreview && !showStoredPreview && !showError ? <PreparingPane /> : null}
       </div>
 
       {stream.phase === 'done' && stream.usage ? (
@@ -137,65 +206,68 @@ export function StepGenerate() {
           {stream.imagesInjected ? ` · ${stream.imagesInjected} images` : ''}
         </p>
       ) : null}
+
+      {hasExistingRound ? (
+        <div className="mt-[var(--space-8)]">
+          <RefinePanel
+            roundCount={currentRoundIndex}
+            maxRounds={MAX_ROUNDS}
+            disabled={isStreaming}
+            rateLimited={rateLimited}
+            onSubmit={handleRefine}
+          />
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function StreamStatus({
-  stream,
-  hasExistingRound,
-}: {
-  stream: ReturnType<typeof useGenerationStream>;
+interface StreamStatusProps {
+  phase: 'idle' | 'streaming' | 'images' | 'done' | 'error';
+  imageCount: number;
   hasExistingRound: boolean;
-}) {
-  if (hasExistingRound && stream.phase === 'idle') {
+  isIteration: boolean;
+}
+
+function StreamStatus({ phase, imageCount, hasExistingRound, isIteration }: StreamStatusProps) {
+  if (phase === 'streaming') {
     return (
-      <div className="flex items-center gap-[var(--space-3)]">
-        <span aria-hidden className="block h-[6px] w-[6px] rounded-full bg-[var(--color-accent)]" />
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Showing your previous generation. Iterate on it from the Refine panel below (lands in Task
-          9).
-        </p>
-      </div>
+      <Status pulse>
+        {isIteration
+          ? 'Streaming the iteration from Claude Opus…'
+          : 'Streaming HTML from Claude Opus…'}
+      </Status>
     );
   }
-  if (stream.phase === 'streaming') {
+  if (phase === 'images') {
     return (
-      <div className="flex items-center gap-[var(--space-3)]">
-        <span
-          aria-hidden
-          className="block h-[6px] w-[6px] animate-pulse rounded-full bg-[var(--color-accent)]"
-        />
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Streaming HTML from Claude Opus…
-        </p>
-      </div>
+      <Status pulse>
+        Compositing {imageCount} image{imageCount === 1 ? '' : 's'}…
+      </Status>
     );
   }
-  if (stream.phase === 'images') {
-    return (
-      <div className="flex items-center gap-[var(--space-3)]">
-        <span
-          aria-hidden
-          className="block h-[6px] w-[6px] animate-pulse rounded-full bg-[var(--color-accent)]"
-        />
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Compositing {stream.imageCount} image{stream.imageCount === 1 ? '' : 's'}…
-        </p>
-      </div>
-    );
+  if (phase === 'done') {
+    return <Status>{isIteration ? 'Iteration complete.' : 'Generation complete.'}</Status>;
   }
-  if (stream.phase === 'done') {
-    return (
-      <div className="flex items-center gap-[var(--space-3)]">
-        <span aria-hidden className="block h-[6px] w-[6px] rounded-full bg-[var(--color-accent)]" />
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Generation complete.
-        </p>
-      </div>
-    );
+  if (hasExistingRound && phase === 'idle') {
+    return <Status>Showing your latest round. Refine below to iterate.</Status>;
   }
   return null;
+}
+
+function Status({ children, pulse = false }: { children: React.ReactNode; pulse?: boolean }) {
+  return (
+    <div className="flex items-center gap-[var(--space-3)]">
+      <span
+        aria-hidden
+        className={[
+          'block h-[6px] w-[6px] rounded-full bg-[var(--color-accent)]',
+          pulse ? 'animate-pulse' : '',
+        ].join(' ')}
+      />
+      <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">{children}</p>
+    </div>
+  );
 }
 
 function PreparingPane() {
