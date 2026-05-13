@@ -202,11 +202,11 @@ export function StepBrief() {
             type="submit"
             className={[
               'inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)]',
-              'bg-[var(--color-ink)] px-[var(--space-6)] py-[var(--space-3)]',
+              'bg-[var(--color-accent)] px-[var(--space-6)] py-[var(--space-3)]',
               'text-[var(--text-base)] font-medium text-[var(--color-surface)]',
               'transition-transform duration-[var(--duration-fast)] hover:-translate-y-px',
               'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
-              'focus-visible:outline-[var(--color-accent)]',
+              'focus-visible:outline-[var(--color-ink)]',
             ].join(' ')}
           >
             Continue to recommendations
