@@ -117,6 +117,14 @@ export const useWizardStore = create<WizardState & WizardActions>()(
     {
       name: WIZARD_PERSIST_KEY,
       storage: createWizardStorage(),
+      // localStorage is a synchronous API, which means Zustand's persist
+      // middleware loads from it *synchronously* on first store access. If
+      // we let that run during SSR + first client render, the server sees
+      // an empty store but the client sees a hydrated one — every component
+      // reading the store gets a hydration mismatch warning. skipHydration
+      // defers the read until we explicitly call `persist.rehydrate()`
+      // from a client-only effect after first paint (see WizardHydrator).
+      skipHydration: true,
       partialize: (state) => ({
         brief: state.brief,
         recommendation: state.recommendation,

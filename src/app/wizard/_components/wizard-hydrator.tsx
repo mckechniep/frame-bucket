@@ -5,16 +5,19 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useWizardStore } from '@/lib/wizard/store';
 
 /**
- * Runs once per wizard session — after Zustand persist finishes hydrating
- * from localStorage, posts every persisted round's artifactId to
- * /api/artifact/exists. The server returns the subset that still exists on
- * disk; the store drops any round whose archive is gone.
+ * Two responsibilities, both client-only:
  *
- * Why: in dev, `tmp/generations/` gets wiped between runs but the user's
- * localStorage survives. Without this step the wizard would render iframes
- * pointing at deleted artifacts (broken-image preview pane, no error
- * message). The check fires once and is silent unless something was
- * dropped, in which case we surface a small notice for ~8s.
+ * 1. Trigger Zustand persist's `rehydrate()` after first paint. The store
+ *    is configured with `skipHydration: true` so SSR + first client render
+ *    both see the empty initial state (no hydration mismatch warnings).
+ *    Once we're mounted on the client, we kick off rehydration; components
+ *    re-render with the persisted values.
+ *
+ * 2. After hydration finishes, POST every persisted round's artifactId to
+ *    /api/artifact/exists and drop rounds whose archive directories are
+ *    gone (common in dev when `tmp/generations/` gets wiped). The check
+ *    is silent unless something was dropped, in which case we surface a
+ *    small notice for ~8s.
  */
 
 function useStoreHydrated(): boolean {
@@ -34,6 +37,14 @@ export function WizardHydrator() {
   // survive across remounts; a ref is per-mount which is fine here because
   // StrictMode dev only doubles the initial mount, not subsequent ones.
   const hasRunRef = useRef(false);
+
+  // Trigger Zustand's deferred hydration. With `skipHydration: true` on the
+  // persist config, the store doesn't read localStorage until we call this.
+  // Running it from a client-only effect keeps SSR-vs-first-client-render
+  // identical (both see the empty initial state) — no mismatch warnings.
+  useEffect(() => {
+    void useWizardStore.persist.rehydrate();
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;

@@ -26,17 +26,20 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
   });
 
   // The <dialog> element is opened imperatively via showModal() so we get
-  // backdrop dimming, focus trapping, and Esc-to-close for free. The effect
-  // owns the dialog for the modal's React lifetime: open on mount, close on
-  // unmount. Empty deps ensure no mid-life re-fires.
+  // backdrop dimming, focus trapping, and Esc-to-close for free. We listen
+  // to the 'cancel' event (Esc key on modal) — NOT 'close' — because 'close'
+  // fires on every dialog.close() including the cleanup's own teardown, and
+  // in StrictMode dev a queued 'close' from cleanup gets caught by the
+  // remount's freshly-attached listener, producing a flash-open-then-shut
+  // bug. 'cancel' fires only on user intent.
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (!dialog.open) dialog.showModal();
-    const handleClose = () => onCloseRef.current();
-    dialog.addEventListener('close', handleClose);
+    const handleCancel = () => onCloseRef.current();
+    dialog.addEventListener('cancel', handleCancel);
     return () => {
-      dialog.removeEventListener('close', handleClose);
+      dialog.removeEventListener('cancel', handleCancel);
       if (dialog.open) dialog.close();
     };
   }, []);
@@ -45,7 +48,7 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
     event.preventDefault();
     const trimmed = name.trim().slice(0, MAX_NAME_LENGTH);
     setCheckpointName(round.artifactId, trimmed.length > 0 ? trimmed : undefined);
-    dialogRef.current?.close();
+    onClose();
   }
 
   function handleBackdropClick(event: React.MouseEvent<HTMLDialogElement>) {
@@ -53,7 +56,7 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
     // backdrop pseudo-element. The backdrop click target is the dialog
     // itself; clicks inside content stop here via the form's stopPropagation.
     if (event.target === dialogRef.current) {
-      dialogRef.current.close();
+      onClose();
     }
   }
 
@@ -97,7 +100,7 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
         <footer className="flex items-center justify-end gap-[var(--space-3)]">
           <button
             type="button"
-            onClick={() => dialogRef.current?.close()}
+            onClick={onClose}
             className="rounded-[var(--radius-md)] px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
           >
             Cancel

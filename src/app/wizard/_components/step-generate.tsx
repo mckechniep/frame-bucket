@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import type { Recipe } from '@/lib/types';
+import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
@@ -148,15 +150,21 @@ export function StepGenerate() {
   const isStreaming = stream.phase === 'streaming' || stream.phase === 'images';
   const rateLimited = stream.phase === 'error' && !!stream.error?.startsWith('429');
 
-  const showLivePreview = isStreaming;
+  // Show a generating-state pane during streaming + image compositing rather
+  // than live srcDoc updates. Each srcDoc swap tears down the iframe and
+  // re-parses the document, which re-fetches every external resource
+  // referenced inside the artifact (fonts, images) — at ~5fps over a 30s
+  // stream the user sees thousands of font requests and severe flicker.
+  // The finished preview lands on `done` via the stable /preview/<id> route.
   const previewArtifactId = activeArtifactId ?? latestRound?.artifactId ?? null;
-  const showStoredPreview = !showLivePreview && !!previewArtifactId && stream.phase !== 'error';
+  const showGeneratingPane = isStreaming;
+  const showStoredPreview = !showGeneratingPane && !!previewArtifactId && stream.phase !== 'error';
   const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
   // Side-by-side only fires when comparing AND the comparison target differs
   // from the active artifact (otherwise we'd render the same iframe twice).
-  // Live streaming also suppresses comparison because the live preview is
-  // single-pane by design.
+  // Streaming also suppresses comparison because the preview pane is locked
+  // to the generating state during that window.
   const showSideBySide =
     !!compareWithArtifactId &&
     !!previewArtifactId &&
@@ -195,13 +203,11 @@ export function StepGenerate() {
         {hasExistingRound ? <IterationHistory /> : null}
 
         <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
-          {showLivePreview ? (
-            <iframe
-              key="live"
-              sandbox="allow-scripts"
-              srcDoc={stream.html}
-              className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-              title="Live generation preview"
+          {showGeneratingPane ? (
+            <GeneratingPane
+              phase={stream.phase}
+              imageCount={stream.imageCount}
+              isIteration={isIteration}
             />
           ) : null}
 
@@ -224,7 +230,7 @@ export function StepGenerate() {
 
           {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}
 
-          {!showLivePreview && !showStoredPreview && !showError ? <PreparingPane /> : null}
+          {!showGeneratingPane && !showStoredPreview && !showError ? <PreparingPane /> : null}
 
           {stream.phase === 'done' && stream.usage ? (
             <p className="font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
@@ -232,6 +238,10 @@ export function StepGenerate() {
               {stream.usage.outputTokens} out · ${(stream.cost ?? 0).toFixed(3)}
               {stream.imagesInjected ? ` · ${stream.imagesInjected} images` : ''}
             </p>
+          ) : null}
+
+          {hasExistingRound && !isStreaming && previewArtifactId ? (
+            <FinishActions artifactId={previewArtifactId} />
           ) : null}
 
           {hasExistingRound ? (
@@ -302,6 +312,130 @@ function PreparingPane() {
     <div className="flex h-[720px] w-full items-center justify-center rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-alt)]">
       <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">Preparing stream…</p>
     </div>
+  );
+}
+
+interface GeneratingPaneProps {
+  phase: 'streaming' | 'images' | 'idle' | 'done' | 'error';
+  imageCount: number;
+  isIteration: boolean;
+}
+
+function GeneratingPane({ phase, imageCount, isIteration }: GeneratingPaneProps) {
+  const heading = isIteration ? 'Iterating' : 'Generating';
+  const phaseLine =
+    phase === 'images'
+      ? `Compositing ${imageCount} image${imageCount === 1 ? '' : 's'}`
+      : 'Streaming HTML from Claude Opus';
+
+  // Two-phase progress indicator: HTML stream → image composition.
+  // The image phase only kicks in after the HTML is done streaming, so the
+  // first dot lights up on streaming, second dot on images. Provides clearer
+  // signal than a single indeterminate spinner without burning CPU on
+  // animations that flicker the page during a long render.
+  const dots: Array<{ key: string; label: string; active: boolean; done: boolean }> = [
+    {
+      key: 'html',
+      label: 'HTML',
+      active: phase === 'streaming',
+      done: phase === 'images',
+    },
+    {
+      key: 'images',
+      label: 'Images',
+      active: phase === 'images',
+      done: false,
+    },
+  ];
+
+  return (
+    <div className="flex h-[720px] w-full flex-col items-center justify-center gap-[var(--space-6)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-8)]">
+      <div className="flex flex-col items-center gap-[var(--space-3)]">
+        <p className="font-[family-name:var(--font-display)] text-[var(--text-2xl)] tracking-tight text-[var(--color-ink)]">
+          {heading}…
+        </p>
+        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">{phaseLine}</p>
+      </div>
+
+      <ol className="flex items-center gap-[var(--space-6)]" aria-hidden>
+        {dots.map((dot) => (
+          <li key={dot.key} className="flex items-center gap-[var(--space-2)]">
+            <span
+              className={[
+                'block h-[8px] w-[8px] rounded-full transition-colors duration-[var(--duration-fast)]',
+                dot.done
+                  ? 'bg-[var(--color-accent)]'
+                  : dot.active
+                    ? 'animate-pulse bg-[var(--color-accent)]'
+                    : 'bg-[var(--color-border)]',
+              ].join(' ')}
+            />
+            <span
+              className={[
+                'font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.12em]',
+                dot.active || dot.done
+                  ? 'text-[var(--color-ink)]'
+                  : 'text-[var(--color-ink-muted)]',
+              ].join(' ')}
+            >
+              {dot.label}
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="max-w-[36ch] text-center text-[var(--text-base)] text-[var(--color-ink-muted)]">
+        Hang tight — Opus typically finishes the HTML in 30–60 seconds, then we composite images.
+      </p>
+    </div>
+  );
+}
+
+interface FinishActionsProps {
+  artifactId: string;
+}
+
+function FinishActions({ artifactId }: FinishActionsProps) {
+  const router = useRouter();
+  const reset = useWizardStore((s) => s.reset);
+
+  function handleStartOver() {
+    reset();
+    router.push(stepPath('brief'));
+  }
+
+  return (
+    <section
+      aria-label="Finish actions"
+      className="flex flex-col gap-[var(--space-3)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-5)] sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div className="flex flex-col gap-[var(--space-1)]">
+        <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight text-[var(--color-ink)]">
+          Happy with this version?
+        </p>
+        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
+          Open it standalone to share, or start a fresh project from a new brief.
+        </p>
+      </div>
+      <div className="flex items-center gap-[var(--space-3)]">
+        <a
+          href={`/preview/${artifactId}`}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-ink)] bg-transparent px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-ink)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--color-ink)] hover:text-[var(--color-surface)]"
+        >
+          Open standalone
+          <span aria-hidden>↗</span>
+        </a>
+        <button
+          type="button"
+          onClick={handleStartOver}
+          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-ink)] px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px"
+        >
+          Start a new project
+        </button>
+      </div>
+    </section>
   );
 }
 

@@ -40,14 +40,19 @@ describe('wizard persistence', () => {
     expect(parsed.state.brief).toEqual(briefFixture);
   });
 
-  test('a fresh store instance rehydrates from localStorage', async () => {
-    // First instance: write state.
+  test('a fresh store instance rehydrates from localStorage after manual rehydrate', async () => {
+    // First instance: write state. (Persist writes are synchronous to
+    // localStorage on every store update — no rehydrate needed for the write.)
     const first = await importFreshStore();
     first.useWizardStore.getState().setBrief(briefFixture);
     first.useWizardStore.getState().setActiveArtifactId('a-7');
 
-    // Second instance: rehydrate from the same localStorage.
+    // Second instance: skipHydration: true means we have to call rehydrate
+    // explicitly. This mirrors what WizardHydrator does on the client at
+    // first paint — defers the localStorage read out of SSR's render phase
+    // to avoid hydration mismatch warnings.
     const second = await importFreshStore();
+    await second.useWizardStore.persist.rehydrate();
     const state = second.useWizardStore.getState();
 
     expect(state.brief).toEqual(briefFixture);
@@ -60,6 +65,7 @@ describe('wizard persistence', () => {
     first.useWizardStore.getState().setCompareWithArtifactId('a-compare');
 
     const second = await importFreshStore();
+    await second.useWizardStore.persist.rehydrate();
     const state = second.useWizardStore.getState();
 
     expect(state.brief).toEqual(briefFixture);
