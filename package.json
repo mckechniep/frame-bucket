@@ -17,6 +17,7 @@
     "db:types": "supabase gen types typescript --linked > src/lib/supabase/database.types.ts",
     "db:push": "supabase db push --linked",
     "db:diff": "supabase db diff --linked",
+    "check:no-leak": "tsx scripts/check-no-key-leak.ts",
     "gen": "tsx -r tsconfig-paths/register scripts/gen.ts",
     "recommend": "tsx -r tsconfig-paths/register scripts/recommend.ts",
     "iterate": "tsx -r tsconfig-paths/register scripts/iterate.ts",
@@ -34,6 +35,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "0.91.1",
     "@notionhq/client": "5.20.0",
+    "@supabase/supabase-js": "2.105.4",
     "clsx": "2.1.1",
     "lucide-react": "1.11.0",
     "next": "16.2.4",
