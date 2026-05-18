@@ -39,11 +39,9 @@ export async function POST(req: NextRequest) {
   }
 
   const archive = defaultArchiveStore();
-  const results = await Promise.all(
-    parsed.data.artifactIds.map(async (id) => ({ id, exists: await archive.exists(id) })),
-  );
+  const existing = await archive.existsMany(parsed.data.artifactIds);
 
   return Response.json({
-    existing: results.filter((r) => r.exists).map((r) => r.id),
+    existing: Array.from(existing),
   });
 }

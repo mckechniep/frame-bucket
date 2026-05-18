@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import type { ArchiveStore } from './archive-interface';
+export { defaultArchiveStore } from './archive-factory';
 
 export interface ArchiveRecord {
   recipeSummary: string;
@@ -149,8 +150,4 @@ export class FilesystemArchiveStore implements ArchiveStore {
 
     return results.sort((a, b) => a.iterationRound - b.iterationRound);
   }
-}
-
-export function defaultArchiveStore(): ArchiveStore {
-  return new FilesystemArchiveStore(path.join(process.cwd(), 'tmp', 'generations'));
 }
