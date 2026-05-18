@@ -1,5 +1,5 @@
 import type { Recipe } from './recipe';
-import type { ArchiveRecord } from '@/lib/generation/archive';
+import type { ArchiveRecord } from '@/lib/generation/archive-interface';
 
 /**
  * Request payload sent to /api/iterate. Feedback is bounded 10–1000 chars

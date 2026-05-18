@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { ArchiveStore } from './archive-interface';
 
 export interface ArchiveRecord {
   recipeSummary: string;
@@ -43,7 +44,7 @@ function stripIterSuffix(summary: string): string {
   return summary.replace(/\s*\(iter \d+\)\s*$/, '');
 }
 
-export class ArchiveStore {
+export class FilesystemArchiveStore implements ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
   async save(
@@ -88,6 +89,14 @@ export class ArchiveStore {
     } catch {
       return false;
     }
+  }
+
+  async existsMany(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const results = await Promise.all(
+      ids.map(async (id) => ({ id, exists: await this.exists(id) })),
+    );
+    return new Set(results.filter((r) => r.exists).map((r) => r.id));
   }
 
   async read(id: string): Promise<ArchiveRecord | null> {
@@ -143,5 +152,5 @@ export class ArchiveStore {
 }
 
 export function defaultArchiveStore(): ArchiveStore {
-  return new ArchiveStore(path.join(process.cwd(), 'tmp', 'generations'));
+  return new FilesystemArchiveStore(path.join(process.cwd(), 'tmp', 'generations'));
 }
