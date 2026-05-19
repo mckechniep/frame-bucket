@@ -94,6 +94,12 @@ export class SupabaseShareStore implements ShareStore {
    *   5. Any other error propagates
    */
   async trackViewIfNotRecent(token: string, windowMs: number): Promise<boolean> {
+    // Cross-backend parity with MemoryShareStore: missing or revoked shares
+    // must NOT accumulate views. Without this guard, revoked shares would
+    // silently increment view_count via lingering bucket inserts.
+    const share = await this.findByToken(token);
+    if (!share || share.revokedAt) return false;
+
     const sb = supabaseServer();
     const bucketMs = Math.floor(Date.now() / windowMs) * windowMs;
     const bucketIso = new Date(bucketMs).toISOString();

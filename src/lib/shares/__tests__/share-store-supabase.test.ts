@@ -360,8 +360,19 @@ describe('SupabaseShareStore', () => {
     });
 
     it('returns false on 23505 unique violation (throttled)', async () => {
-      const bucketChain = makeChain({
-        error: { code: '23505', message: 'duplicate key' },
+      // findByToken must succeed first (post-guard); only the bucket insert
+      // should hit the 23505 path.
+      const sharesChain = makeChain({
+        data: {
+          token: 'ABCDEFGHIJKLMNOx',
+          artifact_id: 'art-1',
+          name: 'n',
+          revoked_at: null,
+          last_viewed_at: null,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
       });
 
       const fromFn = vi.fn((table: string) => {
@@ -370,7 +381,7 @@ describe('SupabaseShareStore', () => {
             insert: vi.fn(() => Promise.resolve({ error: { code: '23505' } })),
           };
         }
-        return bucketChain;
+        return sharesChain;
       });
 
       supabaseServerMock.mockReturnValue({ from: fromFn });
@@ -379,6 +390,59 @@ describe('SupabaseShareStore', () => {
       const result = await store.trackViewIfNotRecent('ABCDEFGHIJKLMNOx', 60000);
 
       expect(result).toBe(false);
+    });
+
+    it('returns false for a missing token (cross-backend parity)', async () => {
+      // findByToken returns null → guard returns false WITHOUT touching the bucket table.
+      const sharesChain = makeChain({ data: null, error: null });
+      const bucketInsert = vi.fn();
+
+      const fromFn = vi.fn((table: string) => {
+        if (table === 'share_view_buckets') {
+          return { insert: bucketInsert };
+        }
+        return sharesChain;
+      });
+
+      supabaseServerMock.mockReturnValue({ from: fromFn });
+
+      const store = new SupabaseShareStore();
+      const result = await store.trackViewIfNotRecent('ABCDEFGHIJKLMNOx', 60000);
+
+      expect(result).toBe(false);
+      expect(bucketInsert).not.toHaveBeenCalled();
+    });
+
+    it('returns false for a revoked share (cross-backend parity)', async () => {
+      // Matches MemoryShareStore behavior: revoked shares accumulate no views.
+      const sharesChain = makeChain({
+        data: {
+          token: 'ABCDEFGHIJKLMNOx',
+          artifact_id: 'art-1',
+          name: 'n',
+          revoked_at: new Date().toISOString(),
+          last_viewed_at: null,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      });
+      const bucketInsert = vi.fn();
+
+      const fromFn = vi.fn((table: string) => {
+        if (table === 'share_view_buckets') {
+          return { insert: bucketInsert };
+        }
+        return sharesChain;
+      });
+
+      supabaseServerMock.mockReturnValue({ from: fromFn });
+
+      const store = new SupabaseShareStore();
+      const result = await store.trackViewIfNotRecent('ABCDEFGHIJKLMNOx', 60000);
+
+      expect(result).toBe(false);
+      expect(bucketInsert).not.toHaveBeenCalled();
     });
 
     it('returns true even when counter update fails (Rule 5: bucket is source of truth)', async () => {
@@ -420,6 +484,20 @@ describe('SupabaseShareStore', () => {
     });
 
     it('propagates non-23505 bucket insert errors', async () => {
+      // findByToken must succeed past the guard before the bucket insert runs.
+      const sharesChain = makeChain({
+        data: {
+          token: 'ABCDEFGHIJKLMNOx',
+          artifact_id: 'art-1',
+          name: 'n',
+          revoked_at: null,
+          last_viewed_at: null,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+        },
+        error: null,
+      });
+
       const fromFn = vi.fn((table: string) => {
         if (table === 'share_view_buckets') {
           return {
@@ -428,7 +506,7 @@ describe('SupabaseShareStore', () => {
             ),
           };
         }
-        return makeChain({ error: null });
+        return sharesChain;
       });
 
       supabaseServerMock.mockReturnValue({ from: fromFn });
