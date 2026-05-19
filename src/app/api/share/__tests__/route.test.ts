@@ -73,6 +73,15 @@ describe('POST /api/share', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 INVALID when name is only whitespace (post-trim empty)', async () => {
+    // Regression guard: if .trim() runs AFTER .min(1) in the Zod chain,
+    // "   " would pass validation and store as "". Schema must reject.
+    const req = makePostRequest({ artifactId: 'art-1', name: '   ' });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe('INVALID');
+  });
+
   it('returns 404 NOT_FOUND when archive.exists() is false', async () => {
     archiveReturns(false);
     const req = makePostRequest({ artifactId: 'missing', name: 'Share' });

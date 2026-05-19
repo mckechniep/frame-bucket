@@ -7,7 +7,11 @@ export const runtime = 'nodejs';
 
 const CreateBody = z.object({
   artifactId: z.string().min(1),
-  name: z.string().min(1).max(120).trim(),
+  // Order matters: .trim() must run BEFORE .min(1) — otherwise a
+  // whitespace-only input passes .min(1) (length > 0 pre-trim) and then
+  // gets silently reduced to "". Verified empirically: `.min(1).max(120).trim()`
+  // parses "   " as ""; `.trim().min(1).max(120)` rejects it.
+  name: z.string().trim().min(1).max(120),
 });
 
 /**
