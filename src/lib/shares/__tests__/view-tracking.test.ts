@@ -28,6 +28,11 @@ afterEach(() => {
 
 describe('trackView', () => {
   it('returns immediately (does not block on the inner async work)', async () => {
+    // The inner work sleeps for 50ms then sets `resolved = true`. If `trackView`
+    // awaited the inner work, `resolved` would be `true` after the await below.
+    // The `resolved === false` assertion is the load-bearing proof of
+    // synchronous return — it's a logical check, not a timing one, so it
+    // can't flake under CI load.
     let resolved = false;
     const store = makeMockStore({
       trackViewIfNotRecent: vi.fn(async () => {
@@ -37,13 +42,7 @@ describe('trackView', () => {
       }),
     });
 
-    const start = Date.now();
     await trackView(store, 'abcdefghijklmnop', makeHeaders({ 'user-agent': 'Mozilla/5.0' }));
-    const elapsed = Date.now() - start;
-
-    // Should return well under the 50ms inner work
-    expect(elapsed).toBeLessThan(20);
-    // Inner work hasn't completed yet
     expect(resolved).toBe(false);
   });
 
