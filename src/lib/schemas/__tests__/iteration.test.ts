@@ -150,8 +150,17 @@ describe('IterationRequestSchema — recipe shape', () => {
 // ---------------------------------------------------------------------------
 
 describe('IterationRequestSchema — other required fields', () => {
-  it('rejects an empty previousHtml', () => {
-    expect(() => IterationRequestSchema.parse({ ...validRequest, previousHtml: '' })).toThrow();
+  it('accepts a request without previousHtml (Rule 1: server reads parent.htmlSource)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { previousHtml: _omit, ...withoutHtml } = validRequest;
+    const result = IterationRequestSchema.parse(withoutHtml);
+    expect(result.previousHtml).toBeUndefined();
+    expect(result.previousArtifactId).toBe(validRequest.previousArtifactId);
+  });
+
+  it('accepts a request with previousHtml present (backward-compat for CLI)', () => {
+    const result = IterationRequestSchema.parse(validRequest);
+    expect(result.previousHtml).toBe(validRequest.previousHtml);
   });
 
   it('rejects an empty previousArtifactId', () => {

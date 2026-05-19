@@ -1,6 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import type { ArchiveStore } from './archive-interface';
+export { defaultArchiveStore } from './archive-factory';
 
 export interface ArchiveRecord {
   recipeSummary: string;
@@ -43,7 +45,7 @@ function stripIterSuffix(summary: string): string {
   return summary.replace(/\s*\(iter \d+\)\s*$/, '');
 }
 
-export class ArchiveStore {
+export class FilesystemArchiveStore implements ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
   async save(
@@ -73,6 +75,29 @@ export class ArchiveStore {
       'utf-8',
     );
     return id;
+  }
+
+  /**
+   * Cheap existence check — only stats the artifact's meta.json. Used by the
+   * wizard's hydrate-and-validate path on session start so we can drop
+   * persisted rounds whose archive directories were wiped (common in dev).
+   */
+  async exists(id: string): Promise<boolean> {
+    const metaPath = path.join(this.rootDir, id, 'meta.json');
+    try {
+      await fs.access(metaPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async existsMany(ids: string[]): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const results = await Promise.all(
+      ids.map(async (id) => ({ id, exists: await this.exists(id) })),
+    );
+    return new Set(results.filter((r) => r.exists).map((r) => r.id));
   }
 
   async read(id: string): Promise<ArchiveRecord | null> {
@@ -125,8 +150,4 @@ export class ArchiveStore {
 
     return results.sort((a, b) => a.iterationRound - b.iterationRound);
   }
-}
-
-export function defaultArchiveStore(): ArchiveStore {
-  return new ArchiveStore(path.join(process.cwd(), 'tmp', 'generations'));
 }

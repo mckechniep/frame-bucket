@@ -1,10 +1,23 @@
+import { redirect } from 'next/navigation';
+
+import { defaultFileStore } from '@/lib/taxonomy/file-store';
+import { STEPS, type Step } from '@/lib/wizard/steps';
+
+import { WizardStepShell } from '../_components/wizard-step-shell';
+
 export default async function WizardStepPage({ params }: { params: Promise<{ step: string }> }) {
   const { step } = await params;
 
-  return (
-    <main className="p-8">
-      <h1 className="text-[var(--text-2xl)]">Wizard: {step}</h1>
-      <p className="mt-4 text-[var(--color-ink-muted)]">Stub for the M4 wizard flow.</p>
-    </main>
-  );
+  if (!STEPS.includes(step as Step)) {
+    redirect('/wizard/brief');
+  }
+
+  // Taxonomy is loaded server-side and handed to the client shell. The
+  // recommend step needs the full taxonomy for its "override" affordance;
+  // the brief and generate steps ignore it. Reading the file store on every
+  // wizard navigation is cheap (a single JSON read) and keeps the client
+  // free of a /api/taxonomy fetch on each step transition.
+  const taxonomy = await defaultFileStore().get();
+
+  return <WizardStepShell step={step as Step} taxonomy={taxonomy} />;
 }

@@ -89,9 +89,23 @@ export async function POST(req: NextRequest) {
     modelOutput = parseRecommendationResponse(rawText, taxonomy);
   } catch (err) {
     if (err instanceof RecommendationParseError) {
+      // Surface the parser's specific message and any Zod issues so the
+      // wizard error pane can diagnose schema-shape failures (e.g., a
+      // reasoning string overshooting the cap) without us having to peek
+      // at server logs.
+      const cause = err.cause;
+      type ZodLikeIssue = { path: Array<string | number>; message: string };
+      const zodIssues =
+        cause && typeof cause === 'object' && 'issues' in cause
+          ? ((cause as { issues: ZodLikeIssue[] }).issues ?? [])
+              .slice(0, 5)
+              .map((i) => ({ path: i.path.join('.'), message: i.message }))
+          : undefined;
       return Response.json(
         {
           error: 'invalid model response',
+          detail: err.message,
+          ...(zodIssues && zodIssues.length > 0 ? { issues: zodIssues } : {}),
           rawText: (err.rawText ?? rawText).slice(0, 500),
         },
         { status: 502 },

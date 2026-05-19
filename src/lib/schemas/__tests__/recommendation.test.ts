@@ -223,8 +223,8 @@ describe('RecommendationResultSchema', () => {
     ).toThrow();
   });
 
-  it('rejects a result with reasoning exceeding 300 chars', () => {
-    const longReasoning = 'A'.repeat(301);
+  it('rejects a result with reasoning exceeding 1200 chars', () => {
+    const longReasoning = 'A'.repeat(1201);
     const badPick = { ...validPick, reasoning: longReasoning };
     expect(() =>
       RecommendationResultSchema.parse({
@@ -236,6 +236,24 @@ describe('RecommendationResultSchema', () => {
         model: 'claude-haiku-4-5',
       }),
     ).toThrow();
+  });
+
+  it('accepts a result with reasoning around 500 chars (real-world observed length)', () => {
+    const realisticReasoning =
+      'Motherhood and breastfeeding demand warmth, safety, and calm—the aesthetic\'s warm whites, soft pastels, and abundant breathing room create an inviting, serene space that signals premium care without clinical coldness. The high-key photography and thin elegant type align perfectly with the brief\'s "gentle, inviting" tone, addressing both functional clarity and emotional reassurance.';
+    expect(realisticReasoning.length).toBeGreaterThan(300);
+    expect(realisticReasoning.length).toBeLessThan(1200);
+    const pick = { ...validPick, reasoning: realisticReasoning };
+    expect(() =>
+      RecommendationResultSchema.parse({
+        aesthetics: [pick],
+        layouts: [],
+        interactions: [],
+        systems: [],
+        generatedAt: '2026-05-05T12:00:00.000Z',
+        model: 'claude-haiku-4-5',
+      }),
+    ).not.toThrow();
   });
 
   it('rejects a result with more than 5 picks in a bucket', () => {
