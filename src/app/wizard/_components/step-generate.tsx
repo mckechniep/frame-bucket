@@ -8,6 +8,7 @@ import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
+import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
@@ -398,6 +399,13 @@ interface FinishActionsProps {
 function FinishActions({ artifactId }: FinishActionsProps) {
   const router = useRouter();
   const reset = useWizardStore((s) => s.reset);
+  const brief = useWizardStore((s) => s.brief);
+  const rounds = useWizardStore((s) => s.rounds);
+  const [shareOpen, setShareOpen] = useState(false);
+
+  const activeRound = rounds.find((r) => r.artifactId === artifactId);
+  const projectName = brief?.projectName?.trim() || 'Untitled';
+  const defaultName = `${projectName} — round ${activeRound?.iterationRound ?? 0}`;
 
   function handleStartOver() {
     reset();
@@ -405,37 +413,56 @@ function FinishActions({ artifactId }: FinishActionsProps) {
   }
 
   return (
-    <section
-      aria-label="Finish actions"
-      className="flex flex-col gap-[var(--space-3)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-5)] sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex flex-col gap-[var(--space-1)]">
-        <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight text-[var(--color-ink)]">
-          Happy with this version?
-        </p>
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Open it standalone to share, or start a fresh project from a new brief.
-        </p>
-      </div>
-      <div className="flex items-center gap-[var(--space-3)]">
-        <a
-          href={`/preview/${artifactId}`}
-          target="_blank"
-          rel="noopener"
-          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-ink)] bg-transparent px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-ink)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--color-ink)] hover:text-[var(--color-surface)]"
-        >
-          Open standalone
-          <span aria-hidden>↗</span>
-        </a>
-        <button
-          type="button"
-          onClick={handleStartOver}
-          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px"
-        >
-          Start a new project
-        </button>
-      </div>
-    </section>
+    <>
+      <section
+        aria-label="Finish actions"
+        className="flex flex-col gap-[var(--space-4)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-5)] sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex flex-col gap-[var(--space-1)]">
+          <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight text-[var(--color-ink)]">
+            Looks good — keep this one?
+          </p>
+          <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
+            Create a share link to save this version and send it to anyone. You can keep refining
+            below if you want.
+          </p>
+        </div>
+        <div className="flex flex-col items-stretch gap-[var(--space-2)] sm:items-end">
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+          >
+            Create share link
+          </button>
+          <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
+            <a
+              href={`/preview/${artifactId}`}
+              target="_blank"
+              rel="noopener"
+              className="underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
+            >
+              Open standalone ↗
+            </a>
+            {' · '}
+            <button
+              type="button"
+              onClick={handleStartOver}
+              className="underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
+            >
+              Start a new project
+            </button>
+          </p>
+        </div>
+      </section>
+
+      <CreateShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        artifactId={artifactId}
+        defaultName={defaultName}
+      />
+    </>
   );
 }
 
