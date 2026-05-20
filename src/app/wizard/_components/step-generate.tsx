@@ -8,6 +8,7 @@ import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
+import { useSharesList } from '../_hooks/use-shares-list';
 import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
 import { RecipeSummaryChip } from './recipe-summary';
@@ -75,6 +76,7 @@ export function StepGenerate() {
   const isIteration = activeRunKey.startsWith('iterate:');
 
   const stream = useGenerationStream(activeRequest, activeRunKey);
+  const { shares, refresh: refreshShares } = useSharesList();
 
   // Persist completed rounds to the store. Guards against double-append on
   // re-entry / StrictMode by checking the round set.
@@ -201,7 +203,7 @@ export function StepGenerate() {
           hasExistingRound ? 'grid grid-cols-1 lg:grid-cols-[320px_1fr]' : 'block',
         ].join(' ')}
       >
-        {hasExistingRound ? <IterationHistory /> : null}
+        {hasExistingRound ? <IterationHistory shares={shares} /> : null}
 
         <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
           {showGeneratingPane ? (
@@ -242,7 +244,7 @@ export function StepGenerate() {
           ) : null}
 
           {hasExistingRound && !isStreaming && previewArtifactId ? (
-            <FinishActions artifactId={previewArtifactId} />
+            <FinishActions artifactId={previewArtifactId} onShareCreated={refreshShares} />
           ) : null}
 
           {hasExistingRound ? (
@@ -394,9 +396,10 @@ function GeneratingPane({ phase, imageCount, isIteration }: GeneratingPaneProps)
 
 interface FinishActionsProps {
   artifactId: string;
+  onShareCreated?: () => void;
 }
 
-function FinishActions({ artifactId }: FinishActionsProps) {
+function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
   const router = useRouter();
   const reset = useWizardStore((s) => s.reset);
   const brief = useWizardStore((s) => s.brief);
@@ -461,6 +464,7 @@ function FinishActions({ artifactId }: FinishActionsProps) {
         onClose={() => setShareOpen(false)}
         artifactId={artifactId}
         defaultName={defaultName}
+        onSuccess={onShareCreated}
       />
     </>
   );

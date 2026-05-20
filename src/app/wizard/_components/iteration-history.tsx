@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { Link2 } from 'lucide-react';
 
+import type { ShareRecord } from '@/lib/shares/share-store';
 import { useWizardStore, type WizardRound } from '@/lib/wizard/store';
 
 import { CheckpointNameModal } from './checkpoint-name-modal';
@@ -21,7 +24,11 @@ function formatGeneratedAt(iso: string): string {
   }
 }
 
-export function IterationHistory() {
+interface IterationHistoryProps {
+  shares?: ShareRecord[];
+}
+
+export function IterationHistory({ shares = [] }: IterationHistoryProps) {
   const rounds = useWizardStore((s) => s.rounds);
   const activeArtifactId = useWizardStore((s) => s.activeArtifactId);
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
@@ -58,6 +65,9 @@ export function IterationHistory() {
         {rounds.map((round) => {
           const isActive = round.artifactId === effectiveActiveId;
           const isComparing = compareWithArtifactId === round.artifactId;
+          const hasActiveShare = shares.some(
+            (s) => s.artifactId === round.artifactId && !s.revokedAt,
+          );
           return (
             <li
               key={round.artifactId}
@@ -98,7 +108,17 @@ export function IterationHistory() {
                 </div>
               </button>
 
-              <div className="flex items-center gap-[var(--space-2)] border-t border-[var(--color-border)] px-[var(--space-4)] py-[var(--space-2)]">
+              <div className="flex items-center gap-[var(--space-3)] border-t border-[var(--color-border)] px-[var(--space-4)] py-[var(--space-2)]">
+                {hasActiveShare ? (
+                  <Link
+                    href="/shares"
+                    title="Has active share(s) — view on /shares"
+                    aria-label="Has active shares — view on shares page"
+                    className="flex h-[18px] w-[18px] items-center justify-center text-[var(--color-accent)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px"
+                  >
+                    <Link2 className="h-3 w-3" aria-hidden />
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => setNamingArtifactId(round.artifactId)}
