@@ -32,6 +32,22 @@ const VIBE_OPTIONS: Array<{ value: Vibe; label: string; tagline: string }> = [
 ];
 
 export function StepBrief() {
+  // BriefForm's input state is seeded from the store via useState
+  // initializers — those only fire on first render. Remount the form
+  // whenever the store's brief flips between absent and present so the
+  // initializers re-read the fresh snapshot. Fixes two cases:
+  //   1. "Start over" calls store.reset() while we're already on
+  //      /wizard/brief (router.push to the same route is a no-op).
+  //      Without a remount, the inputs would still hold previous text.
+  //   2. A returning user with a persisted brief lands here before
+  //      Zustand's deferred rehydration finishes — the remount on
+  //      rehydrate lets useState seed from the populated store.
+  // This is the React 19 idiomatic alternative to setState-in-effect.
+  const existingBrief = useWizardStore((s) => s.brief);
+  return <BriefForm key={existingBrief ? 'has-brief' : 'cleared'} />;
+}
+
+function BriefForm() {
   const router = useRouter();
 
   const existingBrief = useWizardStore((s) => s.brief);
