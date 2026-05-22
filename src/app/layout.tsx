@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Fraunces, Inter } from 'next/font/google';
+import { Fraunces, Hanken_Grotesk } from 'next/font/google';
 
 import './globals.css';
 
@@ -11,9 +11,13 @@ const fraunces = Fraunces({
   display: 'swap',
 });
 
-// Body: Inter. Clean sans, the canonical body pairing for Fraunces per the
-// editorial craft canon.
-const inter = Inter({
+// Body: Hanken Grotesk. Variable Bauhaus-influenced grotesk with real
+// character at body sizes — open apertures, geometric but not sterile.
+// Pairs intentionally with Fraunces' optical-sizing warmth (serif gravitas
+// in headlines, grotesk precision in body) for a Swiss/editorial direction.
+// Chosen over Inter, which the project's own design-quality rules flag as
+// generic AI default.
+const hankenGrotesk = Hanken_Grotesk({
   subsets: ['latin'],
   variable: '--font-body',
   display: 'swap',
@@ -31,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${fraunces.variable} ${inter.variable}`}>{children}</body>
+      <body className={`${fraunces.variable} ${hankenGrotesk.variable}`}>{children}</body>
     </html>
   );
 }
