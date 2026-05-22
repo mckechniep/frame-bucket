@@ -1,10 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import type { Recipe } from '@/lib/types';
-import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
@@ -400,8 +398,6 @@ interface FinishActionsProps {
 }
 
 function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
-  const router = useRouter();
-  const reset = useWizardStore((s) => s.reset);
   const brief = useWizardStore((s) => s.brief);
   const rounds = useWizardStore((s) => s.rounds);
   const [shareOpen, setShareOpen] = useState(false);
@@ -409,11 +405,6 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
   const activeRound = rounds.find((r) => r.artifactId === artifactId);
   const projectName = brief?.projectName?.trim() || 'Untitled';
   const defaultName = `${projectName} — round ${activeRound?.iterationRound ?? 0}`;
-
-  function handleStartOver() {
-    reset();
-    router.push(stepPath('brief'));
-  }
 
   return (
     <>
@@ -438,29 +429,21 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
           >
             Create share link
           </button>
-          {/* Secondary actions: real ghost buttons, not text-styled inline
-              elements. The previous markup put an <a> and a <button> inside
-              a <p> joined by ' · ' which read as a paragraph rather than
-              two interactive affordances. Aligned right with the primary
-              above via sm:items-end on the column. */}
-          <div className="flex items-stretch gap-[var(--space-2)]">
-            <a
-              href={`/preview/${artifactId}`}
-              target="_blank"
-              rel="noopener"
-              className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
-            >
-              Open standalone
-              <span aria-hidden>↗</span>
-            </a>
-            <button
-              type="button"
-              onClick={handleStartOver}
-              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
-            >
-              Start a new project
-            </button>
-          </div>
+          {/* Secondary action — "Open standalone" only. The destructive
+              "Start a new project" was removed from here because it
+              duplicated the top-nav <WizardStartOver/> (which now wears
+              the destructive-red treatment) AND was visually identical
+              to this non-destructive link, which let users wipe the whole
+              session by misreading two buttons that looked the same. */}
+          <a
+            href={`/preview/${artifactId}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+          >
+            Open standalone
+            <span aria-hidden>↗</span>
+          </a>
         </div>
       </section>
 

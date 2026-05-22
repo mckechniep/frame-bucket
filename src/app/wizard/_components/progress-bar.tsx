@@ -129,7 +129,8 @@ export function WizardStartOver() {
     <button
       type="button"
       onClick={handleStartOver}
-      className="text-[var(--text-base)] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] underline-offset-4 hover:underline transition-colors duration-[var(--duration-fast)]"
+      title="Wipes the current project and all generated rounds"
+      className="rounded-[var(--radius-md)] border border-[var(--color-danger-edge)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-danger)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--color-danger-soft)] hover:border-[var(--color-danger)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-danger)]"
     >
       Start over
     </button>
