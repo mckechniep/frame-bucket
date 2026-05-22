@@ -430,7 +430,7 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
             below if you want.
           </p>
         </div>
-        <div className="flex flex-col items-stretch gap-[var(--space-2)] sm:items-end">
+        <div className="flex flex-col items-stretch gap-[var(--space-3)] sm:items-end">
           <button
             type="button"
             onClick={() => setShareOpen(true)}
@@ -438,24 +438,29 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
           >
             Create share link
           </button>
-          <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
+          {/* Secondary actions: real ghost buttons, not text-styled inline
+              elements. The previous markup put an <a> and a <button> inside
+              a <p> joined by ' · ' which read as a paragraph rather than
+              two interactive affordances. Aligned right with the primary
+              above via sm:items-end on the column. */}
+          <div className="flex items-stretch gap-[var(--space-2)]">
             <a
               href={`/preview/${artifactId}`}
               target="_blank"
               rel="noopener"
-              className="underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
+              className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
             >
-              Open standalone ↗
+              Open standalone
+              <span aria-hidden>↗</span>
             </a>
-            {' · '}
             <button
               type="button"
               onClick={handleStartOver}
-              className="underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
+              className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
             >
               Start a new project
             </button>
-          </p>
+          </div>
         </div>
       </section>
 

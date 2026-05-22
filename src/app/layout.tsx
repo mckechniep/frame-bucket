@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
-import { Fraunces, Hanken_Grotesk } from 'next/font/google';
+import { Newsreader, Hanken_Grotesk } from 'next/font/google';
 
 import './globals.css';
 
-// Display: Fraunces. Editorial serif with optical sizing — used for headlines
-// across the wizard and admin surfaces. Variable axes load automatically.
-const fraunces = Fraunces({
+// Display: Newsreader. Variable editorial serif with optical sizing — same
+// technical role Fraunces filled, but sober proportions in place of Fraunces'
+// soft-warmth wobble. Designed by Production Type for digital editorial use;
+// reads with quiet gravitas at headline sizes without the curvy character
+// that polarises Fraunces.
+const newsreader = Newsreader({
   subsets: ['latin'],
   variable: '--font-display',
   display: 'swap',
@@ -35,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${fraunces.variable} ${hankenGrotesk.variable}`}>{children}</body>
+      <body className={`${newsreader.variable} ${hankenGrotesk.variable}`}>{children}</body>
     </html>
   );
 }
