@@ -15,9 +15,18 @@
   --color-danger-soft: color-mix(in oklch, var(--color-danger) 6%, transparent);
   --color-danger-edge: color-mix(in oklch, var(--color-danger) 50%, var(--color-border));
 
+  /* SSR / no-JS fallbacks. next/font sets the same custom properties on
+     <body> with the real face stacks (Plex Serif, Plex Sans, JetBrains
+     Mono, Zen Dots). Body's definitions win for everything inside via
+     the cascade — these :root values only render in the brief moment
+     before next/font's CSS arrives. */
   --font-display: ui-serif, Georgia, 'Times New Roman', serif;
   --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, 'Cascadia Code', 'Liberation Mono', monospace;
+  /* Brand mark only — applied to the "Frame Bucket" wordmark in the wizard
+     nav. No good system fallback for Zen Dots' dot-construction; the chain
+     degrades to a generic geometric sans during the load gap. */
+  --font-brand: ui-sans-serif, system-ui, sans-serif;
   --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.0625rem);
   --text-lg: clamp(1.125rem, 1.06rem + 0.3vw, 1.25rem);
   --text-xl: clamp(1.375rem, 1.25rem + 0.6vw, 1.625rem);
