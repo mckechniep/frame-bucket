@@ -18,22 +18,25 @@ export function RankedPickCard({ pick, rank, selected, onSelect }: RankedPickCar
       onClick={onSelect}
       aria-pressed={selected}
       className={[
-        'group block w-full rounded-[var(--radius-md)] border bg-[var(--color-surface)]',
-        'p-[var(--space-5)] text-left',
+        'group block w-full rounded-[var(--radius-md)] border text-left',
+        'p-[var(--space-5)]',
         'transition-all duration-[var(--duration-fast)]',
+        // Selected state goes beyond a 1px accent ring: adds a soft
+        // accent background tint so the card reads as actively chosen
+        // from across the page, not "ringed but identical color".
         selected
-          ? 'border-[var(--color-accent)] shadow-[0_0_0_1px_var(--color-accent)]'
-          : 'border-[var(--color-border)] hover:border-[var(--color-ink-muted)]',
+          ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] shadow-[0_0_0_1px_var(--color-accent)]'
+          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:-translate-y-px hover:border-[var(--color-ink-muted)]',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[var(--color-accent)]',
       ].join(' ')}
     >
       <div className="flex items-start justify-between gap-[var(--space-4)]">
         <div className="flex items-baseline gap-[var(--space-3)]">
-          <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums text-[var(--color-ink-muted)]">
+          <span className="font-[family-name:var(--font-mono)] text-[var(--text-lg)] tabular-nums text-[var(--color-ink-muted)]">
             {rank.toString().padStart(2, '0')}
           </span>
-          <h3 className="font-[family-name:var(--font-display)] text-[var(--text-xl)] tracking-tight text-[var(--color-ink)]">
+          <h3 className="font-[family-name:var(--font-display)] text-[var(--text-xl)] font-medium tracking-tight text-[var(--color-ink)]">
             {pick.entryName}
           </h3>
         </div>
