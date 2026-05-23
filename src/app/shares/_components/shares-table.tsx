@@ -45,14 +45,14 @@ function ShareSection({ label, count, shares, muted }: ShareSectionProps) {
   return (
     <section
       aria-label={`${label} shares`}
-      className={['flex flex-col gap-[var(--space-3)]', muted ? 'opacity-80' : ''].join(' ')}
+      className={['flex flex-col gap-[var(--space-4)]', muted ? 'opacity-75' : ''].join(' ')}
     >
-      <header className="flex items-baseline justify-between gap-[var(--space-3)] border-b border-[var(--color-border)] pb-[var(--space-2)]">
-        <h2 className="font-[family-name:var(--font-display)] text-[var(--text-xl)] tracking-tight text-[var(--color-ink)]">
+      <header className="flex items-baseline gap-[var(--space-4)]">
+        <h2 className="font-[family-name:var(--font-display)] text-[var(--text-2xl)] tracking-tight text-[var(--color-ink)]">
           {label}
         </h2>
-        <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums text-[var(--color-ink-muted)]">
-          {count}
+        <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums uppercase tracking-[0.15em] text-[var(--color-ink-muted)]">
+          {count} {count === 1 ? 'share' : 'shares'}
         </span>
       </header>
 
@@ -69,13 +69,17 @@ function EmptyState() {
   return (
     <section
       aria-label="No shares yet"
-      className="flex flex-col items-start gap-[var(--space-3)] rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-8)]"
+      className="flex flex-col items-start gap-[var(--space-4)] rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-12)]"
     >
-      <p className="font-[family-name:var(--font-display)] text-[var(--text-xl)] tracking-tight text-[var(--color-ink)]">
-        No shares yet.
+      <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.2em] text-[var(--color-ink-muted)]">
+        Empty
+      </span>
+      <p className="max-w-[44ch] font-[family-name:var(--font-display)] text-[var(--text-2xl)] tracking-tight text-[var(--color-ink)]">
+        No share links yet.
       </p>
-      <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-        Create one from the Finish panel after generating an artifact.
+      <p className="max-w-[60ch] text-[var(--text-base)] leading-relaxed text-[var(--color-ink-muted)]">
+        Generate an artifact in the wizard, then look for the “Create share link” button on the
+        Finish panel. Links you create will appear here.
       </p>
     </section>
   );
