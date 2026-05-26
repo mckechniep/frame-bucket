@@ -30,7 +30,7 @@ const recipe: Recipe = {
   brief: {
     projectName: 'Maple St Bakery',
     industry: 'Food & Beverage',
-    vibe: 'mom-and-pop',
+    posture: 'boutique',
     description: 'artisanal bakery; avoid generic cafe tropes',
   },
   aesthetic: entry({ id: 'editorial', hasOverride: true }),

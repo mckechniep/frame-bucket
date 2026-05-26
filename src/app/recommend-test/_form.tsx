@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Taxonomy, Vibe } from '@/lib/types';
+import type { Taxonomy, Posture } from '@/lib/types';
 import type { RecommendationResult, RankedPick } from '@/lib/types/recommendation';
 
 interface RecommendResponse {
@@ -14,8 +14,8 @@ interface RecommendResponse {
 export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy }) {
   const [projectName, setProjectName] = useState('Maple St Bakery');
   const [industry, setIndustry] = useState('Food & Beverage');
-  const [vibe, setVibe] = useState<Vibe>('mom-and-pop');
-  const [customVibe, setCustomVibe] = useState('');
+  const [posture, setPosture] = useState<Posture>('boutique');
+  const [customPosture, setCustomPosture] = useState('');
   const [description, setDescription] = useState(
     'Family-run bakery; avoid generic cafe tropes; warm and considered.',
   );
@@ -42,9 +42,9 @@ export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy 
     const brief = {
       projectName,
       industry,
-      vibe,
+      posture,
       description,
-      ...(vibe === 'custom' && customVibe ? { customVibe } : {}),
+      ...(posture === 'custom' && customPosture ? { customPosture } : {}),
     };
 
     try {
@@ -69,7 +69,7 @@ export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy 
     } finally {
       setLoading(false);
     }
-  }, [projectName, industry, vibe, customVibe, description]);
+  }, [projectName, industry, posture, customPosture, description]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -88,24 +88,24 @@ export function RecommendTestForm({ taxonomy: _taxonomy }: { taxonomy: Taxonomy 
             className="w-full border border-[var(--color-border)] rounded-[var(--radius-md)] px-3 py-2"
           />
         </Field>
-        <Field label="Vibe">
+        <Field label="Posture">
           <select
-            value={vibe}
-            onChange={(e) => setVibe(e.target.value as Vibe)}
+            value={posture}
+            onChange={(e) => setPosture(e.target.value as Posture)}
             className="w-full border border-[var(--color-border)] rounded-[var(--radius-md)] px-3 py-2"
           >
-            <option value="mom-and-pop">Mom &amp; Pop</option>
-            <option value="scrappy-startup">Scrappy Startup</option>
+            <option value="boutique">Boutique</option>
+            <option value="startup">Startup</option>
             <option value="enterprise">Enterprise</option>
             <option value="custom">Custom</option>
           </select>
         </Field>
-        {vibe === 'custom' && (
-          <Field label="Custom vibe description">
+        {posture === 'custom' && (
+          <Field label="Custom posture description">
             <input
-              value={customVibe}
-              onChange={(e) => setCustomVibe(e.target.value)}
-              placeholder="Describe the vibe..."
+              value={customPosture}
+              onChange={(e) => setCustomPosture(e.target.value)}
+              placeholder="Describe the posture…"
               className="w-full border border-[var(--color-border)] rounded-[var(--radius-md)] px-3 py-2"
             />
           </Field>

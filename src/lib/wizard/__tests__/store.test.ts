@@ -7,7 +7,7 @@ import type { Brief, Recipe, RecommendationResult, TaxonomyEntry } from '@/lib/t
 const briefFixture: Brief = {
   projectName: 'Acme Coffee',
   industry: 'cafe',
-  vibe: 'mom-and-pop',
+  posture: 'boutique',
   description: 'Neighborhood coffee shop landing page with menu and hours.',
 };
 

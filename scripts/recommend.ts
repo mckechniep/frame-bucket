@@ -6,7 +6,7 @@
  *
  * Usage:
  *   pnpm recommend
- *   pnpm recommend --vibe scrappy-startup
+ *   pnpm recommend --posture startup
  *   pnpm recommend --brief-file path/to/brief.json
  *
  * Requires: synced data/taxonomy.json (run /admin sync first), real
@@ -18,7 +18,7 @@ import path from 'node:path';
 // Type-only imports are erased at compile time — they don't trigger
 // runtime module loading, so it's safe to import @/lib/types here even
 // before dotenv runs.
-import type { Brief, Vibe } from '@/lib/types';
+import type { Brief, Posture } from '@/lib/types';
 
 // Load .env.local BEFORE importing anything that touches @/env. The env
 // module validates at module load; without this, the script crashes before
@@ -28,21 +28,21 @@ if (fs.existsSync(envLocal)) {
   dotenvConfig({ path: envLocal, quiet: true });
 }
 
-function parseArgs(): { briefFile?: string; vibe?: Vibe } {
+function parseArgs(): { briefFile?: string; posture?: Posture } {
   const args = process.argv.slice(2);
-  const result: { briefFile?: string; vibe?: Vibe } = {};
+  const result: { briefFile?: string; posture?: Posture } = {};
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--brief-file' && args[i + 1]) {
       result.briefFile = args[++i];
-    } else if (args[i] === '--vibe' && args[i + 1]) {
-      result.vibe = args[++i] as Vibe;
+    } else if (args[i] === '--posture' && args[i + 1]) {
+      result.posture = args[++i] as Posture;
     }
   }
   return result;
 }
 
 async function main(): Promise<void> {
-  const { briefFile, vibe } = parseArgs();
+  const { briefFile, posture } = parseArgs();
 
   // Dynamic imports keep the env-touching modules out of the top-level
   // import chain, which fires before dotenv has populated process.env.
@@ -67,14 +67,14 @@ async function main(): Promise<void> {
     brief = {
       projectName: 'Maple St Bakery',
       industry: 'Food & Beverage',
-      vibe: 'mom-and-pop',
+      posture: 'boutique',
       description: 'Family-run bakery; avoid generic cafe tropes; warm and considered.',
     };
   }
 
-  // CLI --vibe flag overrides whatever the brief file had
-  if (vibe) {
-    brief = { ...brief, vibe };
+  // CLI --posture flag overrides whatever the brief file had
+  if (posture) {
+    brief = { ...brief, posture };
   }
 
   const request = await assembleRecommendationRequest(brief, taxonomy);

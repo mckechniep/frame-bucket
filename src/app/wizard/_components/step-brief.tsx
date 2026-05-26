@@ -4,31 +4,17 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { BriefSchema } from '@/lib/schemas/recommendation';
-import type { Vibe } from '@/lib/types';
+import { POSTURE_DEFINITIONS, type Posture } from '@/lib/types';
 import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
-const VIBE_OPTIONS: Array<{ value: Vibe; label: string; tagline: string }> = [
-  {
-    value: 'mom-and-pop',
-    label: 'Mom & Pop',
-    tagline: 'Warm, hand-considered, local',
-  },
-  {
-    value: 'scrappy-startup',
-    label: 'Scrappy Startup',
-    tagline: 'Lean, expressive, opinionated',
-  },
-  {
-    value: 'enterprise',
-    label: 'Enterprise',
-    tagline: 'Calm, restrained, institutional',
-  },
-  {
-    value: 'custom',
-    label: 'Custom',
-    tagline: 'Describe it yourself',
-  },
+const POSTURE_OPTIONS: Array<{ value: Posture; label: string; tagline: string }> = [
+  ...(
+    Object.entries(POSTURE_DEFINITIONS) as Array<
+      [Exclude<Posture, 'custom'>, (typeof POSTURE_DEFINITIONS)[Exclude<Posture, 'custom'>]]
+    >
+  ).map(([value, def]) => ({ value, label: def.label, tagline: def.tagline })),
+  { value: 'custom' as const, label: 'Custom', tagline: 'Describe it yourself' },
 ];
 
 export function StepBrief() {
@@ -57,8 +43,8 @@ function BriefForm() {
 
   const [projectName, setProjectName] = useState(existingBrief?.projectName ?? '');
   const [industry, setIndustry] = useState(existingBrief?.industry ?? '');
-  const [vibe, setVibe] = useState<Vibe>(existingBrief?.vibe ?? 'mom-and-pop');
-  const [customVibe, setCustomVibe] = useState(existingBrief?.customVibe ?? '');
+  const [posture, setPosture] = useState<Posture>(existingBrief?.posture ?? 'boutique');
+  const [customPosture, setCustomPosture] = useState(existingBrief?.customPosture ?? '');
   const [description, setDescription] = useState(existingBrief?.description ?? '');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -69,9 +55,11 @@ function BriefForm() {
     const candidate = {
       projectName: projectName.trim(),
       industry: industry.trim(),
-      vibe,
+      posture,
       description: description.trim(),
-      ...(vibe === 'custom' && customVibe.trim() ? { customVibe: customVibe.trim() } : {}),
+      ...(posture === 'custom' && customPosture.trim()
+        ? { customPosture: customPosture.trim() }
+        : {}),
     };
 
     const parsed = BriefSchema.safeParse(candidate);
@@ -141,11 +129,11 @@ function BriefForm() {
 
         <fieldset className="space-y-[var(--space-3)]">
           <legend className="text-[var(--text-base)] font-medium text-[var(--color-ink)]">
-            Vibe
+            Posture
           </legend>
           <div className="grid grid-cols-1 gap-[var(--space-3)] sm:grid-cols-2">
-            {VIBE_OPTIONS.map((option) => {
-              const checked = vibe === option.value;
+            {POSTURE_OPTIONS.map((option) => {
+              const checked = posture === option.value;
               return (
                 <label
                   key={option.value}
@@ -160,10 +148,10 @@ function BriefForm() {
                 >
                   <input
                     type="radio"
-                    name="vibe"
+                    name="posture"
                     value={option.value}
                     checked={checked}
-                    onChange={() => setVibe(option.value)}
+                    onChange={() => setPosture(option.value)}
                     className="sr-only"
                   />
                   <span className="text-[var(--text-base)] font-medium text-[var(--color-ink)]">
@@ -176,22 +164,22 @@ function BriefForm() {
               );
             })}
           </div>
-          {fieldErrors.vibe ? <FieldError message={fieldErrors.vibe} /> : null}
+          {fieldErrors.posture ? <FieldError message={fieldErrors.posture} /> : null}
         </fieldset>
 
-        {vibe === 'custom' ? (
+        {posture === 'custom' ? (
           <Field
-            label="Describe the custom vibe"
-            htmlFor="customVibe"
-            error={fieldErrors.customVibe}
+            label="Describe the custom posture"
+            htmlFor="customPosture"
+            error={fieldErrors.customPosture}
           >
             <input
-              id="customVibe"
+              id="customPosture"
               type="text"
-              value={customVibe}
-              onChange={(e) => setCustomVibe(e.target.value)}
+              value={customPosture}
+              onChange={(e) => setCustomPosture(e.target.value)}
               placeholder="Editorial, sober, a bit Swiss…"
-              className={inputClass(Boolean(fieldErrors.customVibe))}
+              className={inputClass(Boolean(fieldErrors.customPosture))}
               autoComplete="off"
             />
           </Field>

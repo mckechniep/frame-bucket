@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useState } from 'react';
-import type { Taxonomy, TaxonomyEntry, Recipe, Vibe } from '@/lib/types';
+import type { Taxonomy, TaxonomyEntry, Recipe, Posture } from '@/lib/types';
 import { StreamView } from './_stream-view';
 import type { Round, StreamRequest } from './_stream-view';
 import { RefinePanel } from './_refine-panel';
@@ -10,7 +10,7 @@ const MAX_ROUNDS = 3;
 export function GenerateTestForm({ taxonomy }: { taxonomy: Taxonomy }) {
   const [projectName, setProjectName] = useState('Maple St Bakery');
   const [industry, setIndustry] = useState('Food & Beverage');
-  const [vibe, setVibe] = useState<Vibe>('mom-and-pop');
+  const [posture, setPosture] = useState<Posture>('boutique');
   const [description, setDescription] = useState(
     'Family-run bakery; avoid generic cafe tropes; warm and considered.',
   );
@@ -41,7 +41,7 @@ export function GenerateTestForm({ taxonomy }: { taxonomy: Taxonomy }) {
       return;
     }
     const recipe: Recipe = {
-      brief: { projectName, industry, vibe, description },
+      brief: { projectName, industry, posture, description },
       aesthetic,
       layout,
     };
@@ -123,14 +123,14 @@ export function GenerateTestForm({ taxonomy }: { taxonomy: Taxonomy }) {
               className="w-full border border-[var(--color-border)] rounded-[var(--radius-md)] px-3 py-2"
             />
           </Field>
-          <Field label="Vibe">
+          <Field label="Posture">
             <select
-              value={vibe}
-              onChange={(e) => setVibe(e.target.value as Vibe)}
+              value={posture}
+              onChange={(e) => setPosture(e.target.value as Posture)}
               className="w-full border border-[var(--color-border)] rounded-[var(--radius-md)] px-3 py-2"
             >
-              <option value="mom-and-pop">Mom &amp; Pop</option>
-              <option value="scrappy-startup">Scrappy Startup</option>
+              <option value="boutique">Boutique</option>
+              <option value="startup">Startup</option>
               <option value="enterprise">Enterprise</option>
               <option value="custom">Custom</option>
             </select>

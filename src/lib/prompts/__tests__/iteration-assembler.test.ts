@@ -37,7 +37,7 @@ const baseRequest: IterationRequest = {
     brief: {
       projectName: 'Test Project',
       industry: 'Technology',
-      vibe: 'scrappy-startup',
+      posture: 'startup',
       description: 'A test description',
     },
     aesthetic: entry({ id: 'editorial', name: 'Editorial', hasOverride: true }),

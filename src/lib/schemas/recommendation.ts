@@ -6,15 +6,16 @@ import { z } from 'zod';
 // NOTE: `description` is required here (min 10 chars) even though the `Brief`
 // type in @/lib/types has `description?: string`. The recommendation route
 // needs a real description to produce useful picks, so the schema is
-// intentionally stricter than the base type. `customVibe` and `colorsProvided`
-// are included as optional to stay permissive with Brief-shaped input.
+// intentionally stricter than the base type. `customPosture` and
+// `colorsProvided` are included as optional to stay permissive with
+// Brief-shaped input.
 
 export const BriefSchema = z.object({
   projectName: z.string().min(1),
   industry: z.string().min(1),
-  vibe: z.enum(['mom-and-pop', 'scrappy-startup', 'enterprise', 'custom']),
+  posture: z.enum(['boutique', 'startup', 'enterprise', 'custom']),
   description: z.string().min(10),
-  customVibe: z.string().optional(),
+  customPosture: z.string().optional(),
   colorsProvided: z.array(z.string()).optional(),
 });
 

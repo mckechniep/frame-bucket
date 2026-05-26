@@ -60,7 +60,7 @@ async function main(): Promise<void> {
     brief: {
       projectName: 'Maple St Bakery',
       industry: 'Food & Beverage',
-      vibe: 'mom-and-pop',
+      posture: 'boutique',
       description: 'Family-run bakery; avoid generic cafe tropes; warm and considered.',
     },
     aesthetic,

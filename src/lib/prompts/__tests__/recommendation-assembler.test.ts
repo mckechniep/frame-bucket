@@ -46,7 +46,7 @@ const fixtureTaxonomy: Taxonomy = {
 const fixtureBrief: Brief = {
   projectName: 'Acme Corp',
   industry: 'Technology',
-  vibe: 'scrappy-startup',
+  posture: 'startup',
   colorsProvided: ['#ff0000', '#0000ff'],
   description: 'A fast-moving startup landing page.',
 };
@@ -109,6 +109,7 @@ describe('assembleRecommendationRequest', () => {
     const content = req.messages[0]?.content ?? '';
     expect(content).toContain('Acme Corp');
     expect(content).toContain('Technology');
-    expect(content).toContain('scrappy-startup');
+    expect(content).toContain('startup');
+    expect(content).toContain('Lean, expressive, opinionated');
   });
 });

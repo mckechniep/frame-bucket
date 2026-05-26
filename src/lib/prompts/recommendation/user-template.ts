@@ -1,5 +1,5 @@
 import type { Taxonomy } from '@/lib/types/taxonomy';
-import type { Brief } from '@/lib/types/recipe';
+import { POSTURE_DEFINITIONS, type Brief } from '@/lib/types/recipe';
 
 /**
  * Returns a condensed markdown summary of the taxonomy grouped by bucket.
@@ -34,7 +34,10 @@ export function formatTaxonomySummary(taxonomy: Taxonomy): string {
  * If the `Brief` shape changes, update both functions together.
  */
 export function formatBrief(brief: Brief): string {
-  const vibe = brief.vibe === 'custom' ? (brief.customVibe ?? 'custom') : brief.vibe;
+  const posture =
+    brief.posture === 'custom'
+      ? brief.customPosture?.trim() || 'custom'
+      : `${brief.posture} — ${POSTURE_DEFINITIONS[brief.posture].tagline}`;
   const colorLine = brief.colorsProvided?.length
     ? `- **Color hints:** ${brief.colorsProvided.join(', ')}`
     : '- **Color hints:** (none — you choose)';
@@ -44,7 +47,7 @@ export function formatBrief(brief: Brief): string {
     '',
     `- **Project name:** ${brief.projectName}`,
     `- **Industry:** ${brief.industry}`,
-    `- **Vibe:** ${vibe}`,
+    `- **Posture:** ${posture}`,
     colorLine,
     `- **Notes:** ${brief.description ?? '(none)'}`,
   ];

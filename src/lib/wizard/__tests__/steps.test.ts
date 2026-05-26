@@ -15,7 +15,7 @@ import {
 const briefFixture: Brief = {
   projectName: 'Acme',
   industry: 'cafe',
-  vibe: 'mom-and-pop',
+  posture: 'boutique',
   description: 'A cafe site.',
 };
 
