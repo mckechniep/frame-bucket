@@ -8,7 +8,7 @@
  *   pnpm iterate <archive-id> "<feedback>"
  *   pnpm iterate <archive-id> --feedback-file path/to/feedback.txt
  *   pnpm iterate <archive-id> "<feedback>" --brief-file path/to/brief.json
- *   pnpm iterate <archive-id> "<feedback>" --vibe scrappy-startup
+ *   pnpm iterate <archive-id> "<feedback>" --posture startup
  *
  * The aesthetic + layout pair is recovered from the parent archive's
  * recipeSummary (format: "<aestheticId> + <layoutId>", with any "(iter N)"
@@ -27,7 +27,7 @@ import path from 'node:path';
 // Type-only imports are erased at compile time — they don't trigger
 // runtime module loading, so it's safe to import @/lib/types here even
 // before dotenv runs.
-import type { Brief, Recipe, Vibe } from '@/lib/types';
+import type { Brief, Recipe, Posture } from '@/lib/types';
 
 // Load .env.local BEFORE importing anything that touches @/env. The env
 // module validates at module load; without this, the script crashes before
@@ -41,7 +41,7 @@ interface CliArgs {
   archiveId: string;
   feedback: string;
   briefFile?: string;
-  vibe?: Vibe;
+  posture?: Posture;
 }
 
 function parseArgs(): CliArgs {
@@ -49,7 +49,7 @@ function parseArgs(): CliArgs {
   const positional: string[] = [];
   let briefFile: string | undefined;
   let feedbackFile: string | undefined;
-  let vibe: Vibe | undefined;
+  let posture: Posture | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -57,8 +57,8 @@ function parseArgs(): CliArgs {
       briefFile = args[++i];
     } else if (a === '--feedback-file' && args[i + 1]) {
       feedbackFile = args[++i];
-    } else if (a === '--vibe' && args[i + 1]) {
-      vibe = args[++i] as Vibe;
+    } else if (a === '--posture' && args[i + 1]) {
+      posture = args[++i] as Posture;
     } else if (typeof a === 'string') {
       positional.push(a);
     }
@@ -67,7 +67,7 @@ function parseArgs(): CliArgs {
   const archiveId = positional[0];
   if (!archiveId) {
     console.error(
-      'Usage: pnpm iterate <archive-id> ("<feedback>" | --feedback-file path) [--brief-file path] [--vibe v]',
+      'Usage: pnpm iterate <archive-id> ("<feedback>" | --feedback-file path) [--brief-file path] [--posture p]',
     );
     process.exit(1);
   }
@@ -81,7 +81,7 @@ function parseArgs(): CliArgs {
     process.exit(1);
   }
 
-  return { archiveId, feedback, briefFile, vibe };
+  return { archiveId, feedback, briefFile, posture };
 }
 
 // Replaces inline base64 image data URIs with OPENROUTER: placeholders so the
@@ -114,7 +114,7 @@ function parseRecipeIds(recipeSummary: string): { aestheticId: string; layoutId:
 }
 
 async function main(): Promise<void> {
-  const { archiveId, feedback, briefFile, vibe } = parseArgs();
+  const { archiveId, feedback, briefFile, posture } = parseArgs();
 
   // Dynamic imports keep the env-touching modules out of the top-level
   // import chain, which fires before dotenv has populated process.env.
@@ -169,12 +169,12 @@ async function main(): Promise<void> {
     brief = {
       projectName: 'Maple St Bakery',
       industry: 'Food & Beverage',
-      vibe: 'mom-and-pop',
+      posture: 'boutique',
       description: 'Family-run bakery; avoid generic cafe tropes; warm and considered.',
     };
   }
-  if (vibe) {
-    brief = { ...brief, vibe };
+  if (posture) {
+    brief = { ...brief, posture };
   }
 
   const recipe: Recipe = { brief, aesthetic, layout };

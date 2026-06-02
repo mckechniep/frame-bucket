@@ -69,13 +69,16 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="flex flex-col gap-[var(--space-4)] p-[var(--space-6)]"
+        className="flex flex-col gap-[var(--space-5)] p-[var(--space-6)]"
       >
-        <header>
-          <h2 className="font-[family-name:var(--font-display)] text-[var(--text-2xl)] tracking-tight">
+        <header className="flex flex-col gap-[var(--space-2)]">
+          <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.2em] text-[var(--color-ink-muted)]">
+            Checkpoint
+          </span>
+          <h2 className="font-[family-name:var(--font-display)] text-[var(--text-2xl)] font-medium tracking-tight">
             Name this checkpoint
           </h2>
-          <p className="mt-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
+          <p className="text-[var(--text-base)] leading-relaxed text-[var(--color-ink-muted)]">
             Short label so you remember why this round mattered. Leave it empty to clear an existing
             name.
           </p>
@@ -90,18 +93,18 @@ export function CheckpointNameModal({ round, onClose }: CheckpointNameModalProps
             onChange={(e) => setName(e.target.value)}
             maxLength={MAX_NAME_LENGTH}
             placeholder="e.g. warm palette landed"
-            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--text-base)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[color-mix(in_oklch,var(--color-accent)_30%,transparent)]"
+            className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--text-base)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-ring)]"
           />
           <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums text-[var(--color-ink-muted)]">
             {name.length} / {MAX_NAME_LENGTH}
           </span>
         </label>
 
-        <footer className="flex items-center justify-end gap-[var(--space-3)]">
+        <footer className="flex items-center justify-end gap-[var(--space-2)] border-t border-[var(--color-border)] pt-[var(--space-4)]">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-[var(--radius-md)] px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] underline-offset-4 hover:text-[var(--color-ink)] hover:underline"
+            className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
           >
             Cancel
           </button>

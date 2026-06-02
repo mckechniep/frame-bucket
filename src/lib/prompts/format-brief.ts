@@ -1,4 +1,4 @@
-import type { Recipe } from '@/lib/types';
+import { POSTURE_DEFINITIONS, type Recipe } from '@/lib/types';
 
 /**
  * Formats a project brief as plain text for inclusion in user messages.
@@ -12,11 +12,14 @@ import type { Recipe } from '@/lib/types';
  * uses plain text. If the Brief shape changes, update both functions.
  */
 export function formatBrief(brief: Recipe['brief']): string {
-  const vibe = brief.vibe === 'custom' ? (brief.customVibe ?? 'custom') : brief.vibe;
+  const posture =
+    brief.posture === 'custom'
+      ? brief.customPosture?.trim() || 'custom'
+      : `${brief.posture} — ${POSTURE_DEFINITIONS[brief.posture].tagline}`;
   return [
     `Project name: ${brief.projectName}`,
     `Industry: ${brief.industry}`,
-    `Vibe: ${vibe}`,
+    `Posture: ${posture}`,
     brief.colorsProvided?.length
       ? `Color hints: ${brief.colorsProvided.join(', ')}`
       : 'Color hints: (none — you choose palette that serves the recipe)',

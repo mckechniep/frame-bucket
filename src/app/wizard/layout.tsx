@@ -11,7 +11,7 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-[var(--space-6)] px-[var(--space-8)] py-[var(--space-4)]">
           <div className="flex items-center gap-[var(--space-4)]">
-            <span className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight">
+            <span className="font-[family-name:var(--font-brand)] text-[var(--text-lg)] tracking-[0.02em]">
               Frame Bucket
             </span>
             <span aria-hidden className="h-4 w-px bg-[var(--color-border)]" />

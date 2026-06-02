@@ -7,7 +7,7 @@ import type { Brief } from '@/lib/types';
 const briefFixture: Brief = {
   projectName: 'Acme Coffee',
   industry: 'cafe',
-  vibe: 'mom-and-pop',
+  posture: 'boutique',
   description: 'Neighborhood coffee shop landing page.',
 };
 

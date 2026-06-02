@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import type { Recipe } from '@/lib/types';
-import { stepPath } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
+import { useSharesList } from '../_hooks/use-shares-list';
+import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
@@ -74,6 +74,7 @@ export function StepGenerate() {
   const isIteration = activeRunKey.startsWith('iterate:');
 
   const stream = useGenerationStream(activeRequest, activeRunKey);
+  const { shares, refresh: refreshShares } = useSharesList();
 
   // Persist completed rounds to the store. Guards against double-append on
   // re-entry / StrictMode by checking the round set.
@@ -200,7 +201,7 @@ export function StepGenerate() {
           hasExistingRound ? 'grid grid-cols-1 lg:grid-cols-[320px_1fr]' : 'block',
         ].join(' ')}
       >
-        {hasExistingRound ? <IterationHistory /> : null}
+        {hasExistingRound ? <IterationHistory shares={shares} /> : null}
 
         <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
           {showGeneratingPane ? (
@@ -241,7 +242,7 @@ export function StepGenerate() {
           ) : null}
 
           {hasExistingRound && !isStreaming && previewArtifactId ? (
-            <FinishActions artifactId={previewArtifactId} />
+            <FinishActions artifactId={previewArtifactId} onShareCreated={refreshShares} />
           ) : null}
 
           {hasExistingRound ? (
@@ -393,49 +394,67 @@ function GeneratingPane({ phase, imageCount, isIteration }: GeneratingPaneProps)
 
 interface FinishActionsProps {
   artifactId: string;
+  onShareCreated?: () => void;
 }
 
-function FinishActions({ artifactId }: FinishActionsProps) {
-  const router = useRouter();
-  const reset = useWizardStore((s) => s.reset);
+function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
+  const brief = useWizardStore((s) => s.brief);
+  const rounds = useWizardStore((s) => s.rounds);
+  const [shareOpen, setShareOpen] = useState(false);
 
-  function handleStartOver() {
-    reset();
-    router.push(stepPath('brief'));
-  }
+  const activeRound = rounds.find((r) => r.artifactId === artifactId);
+  const projectName = brief?.projectName?.trim() || 'Untitled';
+  const defaultName = `${projectName} — round ${activeRound?.iterationRound ?? 0}`;
 
   return (
-    <section
-      aria-label="Finish actions"
-      className="flex flex-col gap-[var(--space-3)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-5)] sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex flex-col gap-[var(--space-1)]">
-        <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight text-[var(--color-ink)]">
-          Happy with this version?
-        </p>
-        <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-          Open it standalone to share, or start a fresh project from a new brief.
-        </p>
-      </div>
-      <div className="flex items-center gap-[var(--space-3)]">
-        <a
-          href={`/preview/${artifactId}`}
-          target="_blank"
-          rel="noopener"
-          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-ink)] bg-transparent px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-ink)] transition-colors duration-[var(--duration-fast)] hover:bg-[var(--color-ink)] hover:text-[var(--color-surface)]"
-        >
-          Open standalone
-          <span aria-hidden>↗</span>
-        </a>
-        <button
-          type="button"
-          onClick={handleStartOver}
-          className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-4)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px"
-        >
-          Start a new project
-        </button>
-      </div>
-    </section>
+    <>
+      <section
+        aria-label="Finish actions"
+        className="flex flex-col gap-[var(--space-4)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] p-[var(--space-5)] sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div className="flex flex-col gap-[var(--space-1)]">
+          <p className="font-[family-name:var(--font-display)] text-[var(--text-lg)] tracking-tight text-[var(--color-ink)]">
+            Looks good — keep this one?
+          </p>
+          <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
+            Create a share link to save this version and send it to anyone. You can keep refining
+            below if you want.
+          </p>
+        </div>
+        <div className="flex flex-col items-stretch gap-[var(--space-3)] sm:items-end">
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+          >
+            Create share link
+          </button>
+          {/* Secondary action — "Open standalone" only. The destructive
+              "Start a new project" was removed from here because it
+              duplicated the top-nav <WizardStartOver/> (which now wears
+              the destructive-red treatment) AND was visually identical
+              to this non-destructive link, which let users wipe the whole
+              session by misreading two buttons that looked the same. */}
+          <a
+            href={`/preview/${artifactId}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+          >
+            Open standalone
+            <span aria-hidden>↗</span>
+          </a>
+        </div>
+      </section>
+
+      <CreateShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        artifactId={artifactId}
+        defaultName={defaultName}
+        onSuccess={onShareCreated}
+      />
+    </>
   );
 }
 

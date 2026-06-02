@@ -1,6 +1,6 @@
 import { createJSONStorage } from 'zustand/middleware';
 
-export const WIZARD_PERSIST_VERSION = 1;
+export const WIZARD_PERSIST_VERSION = 2;
 
 export const WIZARD_PERSIST_KEY = `frame-bucket-wizard@${WIZARD_PERSIST_VERSION}` as const;
 

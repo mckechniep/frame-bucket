@@ -7,13 +7,68 @@ body {
   background: var(--color-surface);
   color: var(--color-ink);
   font-family: var(--font-body);
-  font-feature-settings: 'ss01', 'cv11';
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 
 body {
   margin: 0;
+}
+
+/* Paper-grain atmosphere. SVG fractal-noise turbulence as a fixed
+   body overlay. The tile is 200×200px stitched so it doesn't seam
+   visibly. multiply at 3.5% means each rendered pixel gets ever-so-
+   slightly darkened by the noise pattern — invisible up close, but
+   it removes the flat-pixel sterility of a uniform off-white surface
+   without anyone consciously noticing texture. pointer-events: none
+   so it never intercepts a click. <dialog> elements use the browser
+   top-layer which sits above any z-index, so modals stay above the
+   grain anyway. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+}
+
+/* Replace the browser-default electric-blue selection highlight with
+   a translucent accent-blue tint. Subtle visual signal that text on
+   this product belongs to a designed surface, not a generic webpage. */
+::selection {
+  background: color-mix(in oklch, var(--color-accent) 22%, transparent);
+  color: var(--color-ink);
+}
+
+/* Refined scrollbar. WebKit/Blink only (Firefox uses scrollbar-width).
+   Default OS chrome reads as a system afterthought; a 10px track with
+   an ink-muted pill on a surface-colored border feels integrated with
+   the rest of the type and color system. Hidden on touch devices via
+   the user-agent default (these rules only apply when scrollbars
+   render). */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--color-ink-muted) 32%, transparent);
+  border-radius: 999px;
+  border: 2px solid var(--color-surface);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--color-ink-muted) 60%, transparent);
+}
+
+/* Firefox equivalent of the WebKit thumb styling above. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--color-ink-muted) 32%, transparent) transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

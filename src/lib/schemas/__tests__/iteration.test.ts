@@ -38,7 +38,7 @@ const validTaxonomyEntry = {
 const validBrief = {
   projectName: 'Brew & Bloom',
   industry: 'Coffee shop',
-  vibe: 'mom-and-pop' as const,
+  posture: 'boutique' as const,
   description: 'A warm neighbourhood café celebrating local artisans.',
 };
 

@@ -61,7 +61,7 @@ describe('BriefSchema', () => {
     const input = {
       projectName: 'Brew & Bloom',
       industry: 'Coffee shop',
-      vibe: 'mom-and-pop' as const,
+      posture: 'boutique' as const,
       description: 'A warm neighbourhood café celebrating local artisans.',
     };
     expect(BriefSchema.parse(input)).toEqual(input);
@@ -71,9 +71,9 @@ describe('BriefSchema', () => {
     const input = {
       projectName: 'TechCorp',
       industry: 'SaaS',
-      vibe: 'enterprise' as const,
+      posture: 'enterprise' as const,
       description: 'An enterprise-grade workflow automation platform.',
-      customVibe: 'Polished and authoritative',
+      customPosture: 'Polished and authoritative',
       colorsProvided: ['#0A2540', '#635BFF'],
     };
     expect(BriefSchema.parse(input)).toEqual(input);
@@ -84,7 +84,7 @@ describe('BriefSchema', () => {
       BriefSchema.parse({
         projectName: '',
         industry: 'Retail',
-        vibe: 'scrappy-startup',
+        posture: 'startup',
         description: 'A scrappy online marketplace.',
       }),
     ).toThrow();
@@ -95,18 +95,18 @@ describe('BriefSchema', () => {
       BriefSchema.parse({
         projectName: 'TinyShop',
         industry: 'Retail',
-        vibe: 'scrappy-startup',
+        posture: 'startup',
         description: 'Short',
       }),
     ).toThrow();
   });
 
-  it('rejects a brief with an invalid vibe value', () => {
+  it('rejects a brief with an invalid posture value', () => {
     expect(() =>
       BriefSchema.parse({
         projectName: 'TestCo',
         industry: 'Tech',
-        vibe: 'hipster',
+        posture: 'hipster',
         description: 'A test project description long enough.',
       }),
     ).toThrow();
