@@ -83,6 +83,52 @@ describe('MemoryShareStore', () => {
       expect(fetched?.pages).toHaveLength(1);
     });
 
+    it('snapshot immutability — mutating a field on a returned page does not affect the next findByToken', async () => {
+      const store = new MemoryShareStore();
+      const created = await store.create({
+        siteId: 'site-abc',
+        name: 'snap',
+        pages: [makePage({ slug: '/', title: 'Home', position: 0 })],
+      });
+
+      // Mutate a field on the returned page
+      created.pages[0]!.title = 'MUTATED';
+
+      const fetched = await store.findByToken(created.token);
+      expect(fetched?.pages[0]?.title).toBe('Home');
+    });
+
+    it('snapshot immutability — mutating a field on a page from list() does not affect the next list()', async () => {
+      const store = new MemoryShareStore();
+      await store.create({
+        siteId: 'site-abc',
+        name: 'snap',
+        pages: [makePage({ slug: '/', title: 'Home', position: 0 })],
+      });
+
+      const first = await store.list();
+      first[0]!.pages[0]!.title = 'MUTATED';
+
+      const second = await store.list();
+      expect(second[0]?.pages[0]?.title).toBe('Home');
+    });
+
+    it('snapshot immutability — mutating an input page field after create does not affect the stored snapshot', async () => {
+      const store = new MemoryShareStore();
+      const input: SharePageSnapshot[] = [makePage({ slug: '/', title: 'Home', position: 0 })];
+      const created = await store.create({
+        siteId: 'site-abc',
+        name: 'snap',
+        pages: input,
+      });
+
+      // Mutate the original input's page field
+      input[0]!.title = 'MUTATED';
+
+      const fetched = await store.findByToken(created.token);
+      expect(fetched?.pages[0]?.title).toBe('Home');
+    });
+
     it('legacy create (transitional) — { artifactId, name } still works; siteId is empty string, pages empty', async () => {
       const store = new MemoryShareStore();
       const r = await store.create({ artifactId: 'art-legacy', name: 'legacy share' });
