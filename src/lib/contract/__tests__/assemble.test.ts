@@ -249,6 +249,32 @@ describe('assembleContract — tokensJson', () => {
     expect(obj).toHaveProperty('font');
     expect(typeof obj['color']).toBe('object');
   });
+
+  it('key collision: --color-accent and --accent both survive with distinct keys and values', () => {
+    // --color-accent strips to "accent" (desired), --accent also strips to "accent" (collision)
+    // buildUniqueKey falls back to toFamilySlug("accent") = "accent" (also taken),
+    // then appends a counter → "accent-2"
+    const tokens: DesignTokens = {
+      ...EMPTY_TOKENS,
+      colors: [
+        { name: '--color-accent', value: '#111' },
+        { name: '--accent', value: '#222' },
+      ],
+    };
+    const { tokensJson } = assembleContract(tokens, emptyNarrative(), 'X');
+    const obj = JSON.parse(tokensJson) as { color: Record<string, { value: string }> };
+    // First color gets the desired key "accent"
+    expect(obj.color['accent']).toBeDefined();
+    expect(obj.color['accent']?.value).toBe('#111');
+    // Second color gets the collision-resolved key "accent-2"
+    expect(obj.color['accent-2']).toBeDefined();
+    expect(obj.color['accent-2']?.value).toBe('#222');
+    // Both values are present and distinct
+    const values = Object.values(obj.color).map((c) => c.value);
+    expect(values).toContain('#111');
+    expect(values).toContain('#222');
+    expect(new Set(values).size).toBe(2);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -350,6 +376,35 @@ describe('assembleContract — tokensCss', () => {
     expect(colorsIdx).toBeLessThan(scaleIdx);
     expect(scaleIdx).toBeLessThan(spacingIdx);
     expect(spacingIdx).toBeLessThan(otherIdx);
+  });
+
+  it('CSS injection: note containing */ is neutralized and cannot escape the comment', () => {
+    const tokens: DesignTokens = {
+      ...EMPTY_TOKENS,
+      colors: [{ name: '--color-evil', value: '#f00', note: 'ok */ color: red; /*' }],
+    };
+    const { tokensCss } = assembleContract(tokens, emptyNarrative(), 'X');
+    // The unescaped sequence must not appear — it would close the comment and inject CSS
+    expect(tokensCss).not.toContain('*/ color: red');
+    // The comment must still be present (sanitized form — */ replaced with * /)
+    expect(tokensCss).toContain('/* ok * / color: red; /* */');
+  });
+
+  it('md table: note containing | is escaped as \\| in the rendered table', () => {
+    const tokens: DesignTokens = {
+      ...EMPTY_TOKENS,
+      colors: [{ name: '--color-split', value: '#abc', note: 'left|right' }],
+    };
+    const { contractMd } = assembleContract(tokens, emptyNarrative(), 'X');
+    // The pipe inside the note must be escaped so it doesn't break the table column
+    expect(contractMd).toContain('left\\|right');
+    // The raw unescaped pipe (as a column separator at that position) must NOT appear
+    // i.e. no four-column row where the note cell breaks into two cells
+    const noteLine = contractMd.split('\n').find((l) => l.includes('--color-split'));
+    expect(noteLine).toBeDefined();
+    // A properly escaped row has exactly 4 pipes (| name | value | note |)
+    const pipeCount = (noteLine!.match(/(?<!\\)\|/g) ?? []).length;
+    expect(pipeCount).toBe(4);
   });
 });
 

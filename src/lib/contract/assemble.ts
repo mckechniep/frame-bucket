@@ -1,6 +1,22 @@
 import type { DesignTokens, ContractNarrative } from './types';
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Sanitization helpers
+// ──────────────────────────────────────────────────────────────────────────────
+
+/** Sanitize a value for safe inclusion in a GFM table cell. */
+function mdCell(v: string): string {
+  return v.replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+}
+
+/** Sanitize a note for safe inclusion in a CSS block comment (the kind delimited by slash-star). */
+function cssComment(note: string): string {
+  // Replace the comment-close sequence with a visually-equivalent broken form.
+  // Using '* /' (space-separated) prevents comment terminator injection.
+  return note.replace(/\*\//g, '* /').replace(/\r?\n/g, ' ').trim();
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Public types
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -44,6 +60,10 @@ const DEFAULT_RULES_PLACEHOLDER = `_(No rules captured — paste this contract i
 
 const DEFAULT_PATTERNS_PLACEHOLDER = `_(No component patterns captured — paste this contract into an AI assistant and describe the components you need.)_`;
 
+// NOTE: Narrative prose (identity, rules, componentPatterns, howToExtend) is
+// inserted verbatim and is trusted as well-formed markdown from the controlled
+// Task-7 LLM pipeline. Only TABLE CELL values (tokens + notes) are sanitized
+// via mdCell(), because a broken table corrupts the machine-readable token set.
 function renderContractMd(
   tokens: DesignTokens,
   narrative: ContractNarrative,
@@ -69,7 +89,7 @@ function renderContractMd(
     sections.push('| --- | --- | --- |');
     for (const color of tokens.colors) {
       const note = color.note ?? '';
-      sections.push(`| ${color.name} | ${color.value} | ${note} |`);
+      sections.push(`| ${mdCell(color.name)} | ${mdCell(color.value)} | ${mdCell(note)} |`);
     }
   } else {
     sections.push('_(no color tokens found)_');
@@ -87,7 +107,9 @@ function renderContractMd(
     for (const font of tokens.fonts) {
       const weights = font.weights.join(', ');
       const source = font.source ?? '';
-      sections.push(`| ${font.family} | ${font.role} | ${weights} | ${source} |`);
+      sections.push(
+        `| ${mdCell(font.family)} | ${mdCell(font.role)} | ${mdCell(weights)} | ${mdCell(source)} |`,
+      );
     }
   } else {
     sections.push('_(no font tokens found)_');
@@ -101,7 +123,7 @@ function renderContractMd(
     sections.push('| Name | Value |');
     sections.push('| --- | --- |');
     for (const ts of tokens.typeScale) {
-      sections.push(`| ${ts.name} | \`${ts.value}\` |`);
+      sections.push(`| ${mdCell(ts.name)} | \`${mdCell(ts.value)}\` |`);
     }
   } else {
     sections.push('_(no type scale tokens found)_');
@@ -115,7 +137,7 @@ function renderContractMd(
     sections.push('| Name | Value |');
     sections.push('| --- | --- |');
     for (const sp of tokens.spacing) {
-      sections.push(`| ${sp.name} | ${sp.value} |`);
+      sections.push(`| ${mdCell(sp.name)} | ${mdCell(sp.value)} |`);
     }
   } else {
     sections.push('_(no spacing tokens found)_');
@@ -129,7 +151,7 @@ function renderContractMd(
     sections.push('| Name | Value |');
     sections.push('| --- | --- |');
     for (const o of tokens.other) {
-      sections.push(`| ${o.name} | ${o.value} |`);
+      sections.push(`| ${mdCell(o.name)} | ${mdCell(o.value)} |`);
     }
     sections.push('');
   }
@@ -188,8 +210,6 @@ function stripSpacePrefix(name: string): string {
       if (stripped.length > 0) return stripped;
     }
   }
-  // For bare --gutter (no suffix) keep "gutter"
-  if (name === '--gutter') return 'gutter';
   return name;
 }
 
@@ -318,7 +338,7 @@ function renderTokensCss(tokens: DesignTokens): string {
   if (tokens.colors.length > 0) {
     lines.push('  /* Colors */');
     for (const color of tokens.colors) {
-      const comment = color.note ? ` /* ${color.note} */` : '';
+      const comment = color.note ? ` /* ${cssComment(color.note)} */` : '';
       lines.push(`  ${color.name}: ${color.value};${comment}`);
     }
   }
