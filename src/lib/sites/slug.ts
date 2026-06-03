@@ -12,6 +12,10 @@ export const RESERVED_SLUGS = ['/api', '/s', '/admin', '/shares', '/wizard', '/p
  * - Prefix with `/`
  * - Truncate to 40 chars total (removing trailing hyphens after truncation)
  * - If result is just `/` (empty after cleaning) → return `/page`
+ * - If result is a reserved slug, append `-page` (e.g., `/shares` → `/shares-page`)
+ *
+ * Note: All RESERVED_SLUGS are short (max 8 chars), so appending `-page` (5 chars)
+ * will never exceed 40 chars total, thus no re-truncation is needed.
  */
 export function deriveSlug(title: string): string {
   // 1. Lowercase and replace non-alphanumeric runs with single hyphen
@@ -32,6 +36,11 @@ export function deriveSlug(title: string): string {
     slug = slug.slice(0, 40);
     // Remove trailing hyphen if truncation left one
     slug = slug.replace(/-+$/, '');
+  }
+
+  // 4. If result is a reserved slug, append -page to make it valid
+  if (RESERVED_SLUGS.includes(slug)) {
+    slug = slug + '-page';
   }
 
   return slug;

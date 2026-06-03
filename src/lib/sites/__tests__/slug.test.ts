@@ -57,6 +57,12 @@ describe('deriveSlug', () => {
   it('handles mixed case and numbers', () => {
     expect(deriveSlug('Section 123 Title')).toBe('/section-123-title');
   });
+
+  it('appends -page to reserved slugs', () => {
+    expect(deriveSlug('Shares')).toBe('/shares-page');
+    expect(deriveSlug('S')).toBe('/s-page');
+    expect(deriveSlug('Admin')).toBe('/admin-page');
+  });
 });
 
 describe('isValidSlug', () => {
@@ -171,6 +177,12 @@ describe('isValidSlug', () => {
         'Contact',
         'Section 123 Title',
         'a'.repeat(60),
+        'S',
+        'Api',
+        'Admin',
+        'Shares',
+        'Wizard',
+        'Preview',
       ];
 
       testCases.forEach((title) => {
