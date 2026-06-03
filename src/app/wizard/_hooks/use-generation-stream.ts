@@ -30,7 +30,8 @@ import { dedupedRequest } from '@/lib/wizard/deduped-request';
 
 export type GenerationStreamRequest =
   | { kind: 'generate'; recipe: Recipe }
-  | { kind: 'iterate'; recipe: Recipe; previousArtifactId: string; feedback: string };
+  | { kind: 'iterate'; recipe: Recipe; previousArtifactId: string; feedback: string }
+  | { kind: 'subpage'; siteId: string; slug: string; title: string; brief: string };
 
 export type StreamPhase = 'idle' | 'streaming' | 'images' | 'done' | 'error';
 
@@ -85,18 +86,25 @@ export function useGenerationStream(
 
     let cancelled = false;
 
-    const endpoint = request.kind === 'generate' ? '/api/generate' : '/api/iterate';
+    const endpoint =
+      request.kind === 'subpage'
+        ? `/api/site/${request.siteId}/page`
+        : request.kind === 'generate'
+          ? '/api/generate'
+          : '/api/iterate';
     const body =
       request.kind === 'generate'
         ? { recipe: request.recipe }
-        : {
-            // Rule 1: no `previousHtml`. The route reads parent.htmlSource
-            // server-side. Keeps the wire body small and impossible to
-            // poison with multi-MB post-injection HTML.
-            recipe: request.recipe,
-            previousArtifactId: request.previousArtifactId,
-            feedback: request.feedback,
-          };
+        : request.kind === 'subpage'
+          ? { slug: request.slug, title: request.title, brief: request.brief }
+          : {
+              // Rule 1: no `previousHtml`. The route reads parent.htmlSource
+              // server-side. Keeps the wire body small and impossible to
+              // poison with multi-MB post-injection HTML.
+              recipe: request.recipe,
+              previousArtifactId: request.previousArtifactId,
+              feedback: request.feedback,
+            };
 
     const { promise, release } = dedupedRequest(`${request.kind}:${runKey}`, async (signal) => {
       const res = await fetch(endpoint, {

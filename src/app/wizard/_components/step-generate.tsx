@@ -7,8 +7,10 @@ import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
 import { useSharesList } from '../_hooks/use-shares-list';
+import { AddPageModal } from './add-page-modal';
 import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
+import { PageSwitcher } from './page-switcher';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
 import { SideBySidePreview } from './side-by-side-preview';
@@ -42,8 +44,14 @@ export function StepGenerate() {
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
   const appendRound = useWizardStore((s) => s.appendRound);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
-  const setSiteId = useWizardStore((s) => s.setSiteId);
+  const setSite = useWizardStore((s) => s.setSite);
+  const addPage = useWizardStore((s) => s.addPage);
+  const setActiveSlug = useWizardStore((s) => s.setActiveSlug);
   const siteId = useWizardStore((s) => s.siteId);
+  const pages = useWizardStore((s) => s.pages);
+  const activeSlug = useWizardStore((s) => s.activeSlug);
+
+  const [addPageOpen, setAddPageOpen] = useState(false);
 
   const hasExistingRound = rounds.length > 0;
 
@@ -111,9 +119,15 @@ export function StepGenerate() {
       });
     }
     setActiveArtifactId(stream.artifactId);
-    // Capture the site created during generation so share creation is site-scoped.
-    if (stream.siteId) {
-      setSiteId(stream.siteId);
+    // Establish the site and its initial landing page on first generation.
+    // setSite replaces the old setSiteId call — it atomically sets siteId,
+    // pages ([{ slug:'/', title:'Home', artifactId, position:0 }]), and
+    // resets activeSlug to '/'. Only fires when siteId + artifactId are both
+    // present AND no pages exist yet (guards against double-init on re-entry).
+    if (stream.siteId && stream.artifactId && pages.length === 0) {
+      setSite(stream.siteId, [
+        { slug: '/', title: 'Home', artifactId: stream.artifactId, position: 0 },
+      ]);
     }
   }, [
     stream.phase,
@@ -121,10 +135,11 @@ export function StepGenerate() {
     stream.siteId,
     stream.cost,
     rounds,
+    pages.length,
     selectedRecipe,
     appendRound,
     setActiveArtifactId,
-    setSiteId,
+    setSite,
   ]);
 
   const handleRefine = useCallback(
@@ -154,6 +169,16 @@ export function StepGenerate() {
     [selectedRecipe, rounds],
   );
 
+  const handleSwitch = useCallback(
+    (slug: string) => {
+      const page = pages.find((p) => p.slug === slug);
+      if (!page) return;
+      setActiveSlug(slug);
+      setActiveArtifactId(page.artifactId);
+    },
+    [pages, setActiveSlug, setActiveArtifactId],
+  );
+
   const latestRound = rounds[rounds.length - 1];
   const currentRoundIndex = latestRound?.iterationRound ?? 0;
   const isStreaming = stream.phase === 'streaming' || stream.phase === 'images';
@@ -168,6 +193,13 @@ export function StepGenerate() {
   const previewArtifactId = activeArtifactId ?? latestRound?.artifactId ?? null;
   const showGeneratingPane = isStreaming;
   const showStoredPreview = !showGeneratingPane && !!previewArtifactId && stream.phase !== 'error';
+
+  // Nav injection in the wizard preview requires fetching raw artifact HTML
+  // client-side (injectNav is pure but needs the HTML string). The wizard
+  // preview currently uses the /preview/<id> route which is a Next.js page,
+  // not raw HTML — srcDoc injection is deferred until a
+  // /api/artifact/[id]/html raw-HTML endpoint is added (future task).
+
   const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
   // Side-by-side only fires when comparing AND the comparison target differs
@@ -212,6 +244,14 @@ export function StepGenerate() {
         {hasExistingRound ? <IterationHistory shares={shares} /> : null}
 
         <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
+          {/* Page switcher — hidden when pages array is empty (pre-generation). */}
+          <PageSwitcher
+            pages={pages}
+            activeSlug={activeSlug}
+            onSwitch={handleSwitch}
+            onAddPage={() => setAddPageOpen(true)}
+          />
+
           {showGeneratingPane ? (
             <GeneratingPane
               phase={stream.phase}
@@ -268,6 +308,20 @@ export function StepGenerate() {
           ) : null}
         </div>
       </div>
+
+      {/* AddPageModal — rendered at StepGenerate level so its unmount on close
+          triggers the billable-stream abort in useGenerationStream's cleanup. */}
+      <AddPageModal
+        open={addPageOpen}
+        onClose={() => setAddPageOpen(false)}
+        siteId={siteId ?? ''}
+        existingSlugs={pages.map((p) => p.slug)}
+        onSuccess={(page) => {
+          addPage(page);
+          setActiveSlug(page.slug);
+          setActiveArtifactId(page.artifactId);
+        }}
+      />
     </section>
   );
 }
