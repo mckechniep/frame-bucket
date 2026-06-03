@@ -116,6 +116,21 @@ describe('rewriteLinksForShare — untouched hrefs', () => {
     const result = rewriteLinksForShare(html, TKN, ['/']);
     expect(result).toBe(html);
   });
+
+  it('leaves href="/about/" (trailing slash) untouched', () => {
+    const html = page('<a href="/about/">About</a>');
+    expect(rewriteLinksForShare(html, TKN, KNOWN_SLUGS)).toBe(html);
+  });
+
+  it('leaves href="/about?x=1" (query string) untouched', () => {
+    const html = page('<a href="/about?x=1">About</a>');
+    expect(rewriteLinksForShare(html, TKN, KNOWN_SLUGS)).toBe(html);
+  });
+
+  it('leaves href="/about#top" (fragment) untouched', () => {
+    const html = page('<a href="/about#top">About</a>');
+    expect(rewriteLinksForShare(html, TKN, KNOWN_SLUGS)).toBe(html);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

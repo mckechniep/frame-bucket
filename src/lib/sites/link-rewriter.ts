@@ -34,6 +34,8 @@ export function rewriteLinksForShare(html: string, token: string, knownSlugs: st
   // walk forward respecting quoted attribute values to find the closing >,
   // then inspect / rewrite within that open tag only. This mirrors the
   // anchor-scanning approach in nav-injector.ts without requiring a DOM parser.
+  // Note: Like nav-injector, the walker does not skip <script>/<style>/comment
+  // blocks — acceptable for app-generated content (user HTML is never passed here).
 
   let result = '';
   let cursor = 0;
