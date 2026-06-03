@@ -38,9 +38,14 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     );
   }
 
-  // Active path: fetch the landing page artifact (position 0) from the archive.
-  // Shares are site-scoped (M6) — the landing page is the first page by position.
-  const landingPage = share.pages.find((p) => p.position === 0) ?? share.pages[0];
+  // Active path: fetch the landing page artifact from the archive.
+  // Resolution order: canonical slug '/' first (the true landing page),
+  // then position 0 as a fallback (position 0 is conventional but not
+  // formally guaranteed to be '/'), then first page as last resort.
+  const landingPage =
+    share.pages.find((p) => p.slug === '/') ??
+    share.pages.find((p) => p.position === 0) ??
+    share.pages[0];
   if (!landingPage) {
     // Share exists but has no pages — show the "missing" variant.
     return (

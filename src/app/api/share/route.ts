@@ -81,7 +81,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  * Returns all shares (newest first). Used by the /shares management page
  * (Task 17) and the wizard's history sidebar indicator (Task 16).
  *
- * No pagination in M5 — we expect < few hundred shares before M5b reconsiders.
+ * No pagination in M6 — expect < few hundred shares; reconsider later.
  */
 export async function GET(): Promise<NextResponse> {
   const store = defaultShareStore();

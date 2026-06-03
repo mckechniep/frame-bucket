@@ -94,6 +94,13 @@ function CreateShareModalInner({
         onSuccess?.();
         onClose();
       } else {
+        // Belt-and-suspenders: the submit button is already disabled when
+        // siteId is null, but guard here too for a friendlier error than
+        // a raw Zod 400 from the API.
+        if (!siteId) {
+          setError('No site yet — generate a page first.');
+          return;
+        }
         const res = await fetch('/api/share', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },

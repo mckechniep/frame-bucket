@@ -48,6 +48,12 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
     ? (rounds.find((r) => r.artifactId === namingArtifactId) ?? null)
     : null;
 
+  // Shares are site-scoped (M6): the indicator is site-level, not per-round —
+  // all rounds show it when any active (non-revoked) share exists for this site.
+  // Hoisted outside the map so the check runs once, not once per round.
+  const siteHasActiveShare =
+    siteId !== null && shares.some((s) => s.siteId === siteId && !s.revokedAt);
+
   return (
     <aside
       aria-label="Iteration history"
@@ -66,10 +72,6 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
         {rounds.map((round) => {
           const isActive = round.artifactId === effectiveActiveId;
           const isComparing = compareWithArtifactId === round.artifactId;
-          // Shares are site-scoped (M6): the indicator means "this site has an
-          // active share". All rounds within a session share the same site.
-          const hasActiveShare =
-            siteId !== null && shares.some((s) => s.siteId === siteId && !s.revokedAt);
           return (
             <li
               key={round.artifactId}
@@ -111,7 +113,7 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
               </button>
 
               <div className="flex items-center gap-[var(--space-3)] border-t border-[var(--color-border)] px-[var(--space-4)] py-[var(--space-2)]">
-                {hasActiveShare ? (
+                {siteHasActiveShare ? (
                   <Link
                     href="/shares"
                     title="Has active share(s) — view on /shares"

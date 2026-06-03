@@ -200,6 +200,10 @@ export async function POST(req: NextRequest) {
 
         send('done', {
           artifactId: archiveId,
+          // siteId mirrors /api/generate so the wizard's setSiteId(stream.siteId)
+          // stays correct after a refine. Undefined for non-site flows; the
+          // wizard guards `if (stream.siteId)` before acting on it.
+          ...(siteId !== undefined ? { siteId } : {}),
           usage,
           cost,
           imagesInjected: placeholderCount,

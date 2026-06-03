@@ -287,6 +287,15 @@ describe('POST /api/iterate — happy path without siteId/slug', () => {
 
     expect(mockSetPageArtifact).not.toHaveBeenCalled();
   });
+
+  it('done event omits siteId when no siteId is in the request body', async () => {
+    const res = await POST(makeRequest());
+    const events = await collectEvents(res.body!);
+
+    const doneEvent = events.find((e) => e.event === 'done');
+    expect(doneEvent).toBeDefined();
+    expect((doneEvent!.data as Record<string, unknown>).siteId).toBeUndefined();
+  });
 });
 
 describe('POST /api/iterate — happy path with siteId + slug', () => {
@@ -317,6 +326,15 @@ describe('POST /api/iterate — happy path with siteId + slug', () => {
     const doneEvent = events.find((e) => e.event === 'done');
     expect(doneEvent).toBeDefined();
     expect((doneEvent!.data as Record<string, unknown>).artifactId).toBe('artifact-iter-001');
+  });
+
+  it('done event includes siteId when siteId is provided in the request body', async () => {
+    const res = await POST(makeRequest({ siteId: 'site-deadbeef0001', slug: '/' }));
+    const events = await collectEvents(res.body!);
+
+    const doneEvent = events.find((e) => e.event === 'done');
+    expect(doneEvent).toBeDefined();
+    expect((doneEvent!.data as Record<string, unknown>).siteId).toBe('site-deadbeef0001');
   });
 });
 

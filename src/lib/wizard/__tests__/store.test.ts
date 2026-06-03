@@ -223,15 +223,18 @@ describe('wizard store', () => {
     expect(useWizardStore.getState().siteId).toBeNull();
   });
 
-  test('partialize includes siteId', async () => {
-    const { useWizardStore } = await importFreshStore();
-    useWizardStore.getState().setSiteId('site-persisted');
+  test('partialize includes siteId — real localStorage round-trip', async () => {
+    // Write: set siteId on the first instance; persist middleware writes to
+    // localStorage synchronously on every state update.
+    const first = await importFreshStore();
+    first.useWizardStore.getState().setSiteId('site-persisted');
 
-    // Access the partialize function through the Zustand persist api.
-    // We simulate what persist does: read the state, call partialize, check the result.
-    const state = useWizardStore.getState();
-    // partialize is internal — the simplest proxy is to check the stored field directly.
-    expect(state.siteId).toBe('site-persisted');
+    // Read: a fresh module (= fresh store instance with skipHydration: true)
+    // starts at null. After rehydrate() it should see the persisted siteId.
+    const second = await importFreshStore();
+    await second.useWizardStore.persist.rehydrate();
+
+    expect(second.useWizardStore.getState().siteId).toBe('site-persisted');
   });
 
   test('getWizardState mirrors useWizardStore.getState()', async () => {
