@@ -4,7 +4,7 @@ import { supabaseServer } from '@/lib/supabase/client-server';
 
 type ShareRow = {
   token: string;
-  artifact_id: string;
+  site_id: string;
   name: string;
   revoked_at: string | null;
   last_viewed_at: string | null;
@@ -18,7 +18,7 @@ export class SupabaseShareStore implements ShareStore {
     const token = generateShareToken();
     const { data, error } = await sb
       .from('shares')
-      .insert({ token, artifact_id: artifactId, name })
+      .insert({ token, site_id: artifactId, name })
       .select('*')
       .single();
     if (error) throw new Error(`SupabaseShareStore.create: ${error.message}`);
@@ -146,7 +146,7 @@ export class SupabaseShareStore implements ShareStore {
 function rowToRecord(row: ShareRow): ShareRecord {
   return {
     token: row.token,
-    artifactId: row.artifact_id,
+    artifactId: row.site_id,
     name: row.name,
     revokedAt: row.revoked_at,
     lastViewedAt: row.last_viewed_at,
