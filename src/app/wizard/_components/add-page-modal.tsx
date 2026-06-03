@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
-import { deriveSlug, isValidSlug } from '@/lib/sites/slug';
+import { deriveSlug, isValidSlug, RESERVED_SLUGS, SLUG_REGEX } from '@/lib/sites/slug';
 import type { WizardPage } from '@/lib/wizard/store';
 
 import { useGenerationStream } from '../_hooks/use-generation-stream';
@@ -15,6 +15,7 @@ interface AddPageModalProps {
   onClose: () => void;
   siteId: string;
   existingSlugs: string[];
+  nextPosition: number;
   onSuccess: (page: WizardPage) => void;
 }
 
@@ -29,6 +30,7 @@ function AddPageModalInner({
   onClose,
   siteId,
   existingSlugs,
+  nextPosition,
   onSuccess,
 }: Omit<AddPageModalProps, 'open'>) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -37,6 +39,11 @@ function AddPageModalInner({
   const [brief, setBrief] = useState('');
   const [slugEdited, setSlugEdited] = useState(false);
   const [runKey, setRunKey] = useState('');
+
+  // Captures slug/title at submit time so the done-effect reads the values
+  // that were submitted, not whatever the form holds when the effect fires.
+  // Mirrors iterationContextRef in step-generate.tsx.
+  const submitContextRef = useRef<{ slug: string; title: string } | null>(null);
 
   // Latest onClose ref — same pattern as create-share-modal (M4 Finding 2).
   const onCloseRef = useRef(onClose);
@@ -66,7 +73,8 @@ function AddPageModalInner({
 
   function handleSlugChange(value: string) {
     setSlug(value);
-    setSlugEdited(true);
+    // Clearing the slug re-enables auto-derive from title.
+    setSlugEdited(value.length > 0);
   }
 
   function handleBackdropClick(event: React.MouseEvent<HTMLDialogElement>) {
@@ -93,26 +101,38 @@ function AddPageModalInner({
   const isError = stream.phase === 'error';
 
   // On stream completion, call onSuccess and close.
+  // slug/title are read from the ref (captured at submit time) so this effect
+  // can include all its real deps without stale-closure risk. The ref-null
+  // guard also prevents double-fire if the effect re-runs before the component
+  // unmounts.
   useEffect(() => {
-    if (!isDone || !stream.artifactId) return;
-    const position = existingSlugs.length;
+    if (!isDone || !stream.artifactId || !submitContextRef.current) return;
+    const { slug: submittedSlug, title: submittedTitle } = submitContextRef.current;
     onSuccess({
-      slug,
-      title: title.trim(),
+      slug: submittedSlug,
+      title: submittedTitle,
       artifactId: stream.artifactId,
-      position,
+      position: nextPosition,
     });
     onClose();
-    // Intentionally not including onSuccess/onClose/slug/title in deps —
-    // they're captured at effect-run time; runKey gates re-runs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDone, stream.artifactId]);
+    submitContextRef.current = null;
+  }, [isDone, stream.artifactId, nextPosition, onSuccess, onClose]);
 
-  // Slug validation
+  // Slug validation — distinguish syntax failures from reserved-path failures
+  // so the error message accurately reflects which check failed.
+  // Pre-compute syntax validity separately so we can produce an accurate error
+  // message without hitting TypeScript's narrowing on the isValidSlug type guard.
+  const slugPassesSyntax = slug.length > 0 && slug.length <= 40 && SLUG_REGEX.test(slug);
+  const slugIsReserved =
+    slugPassesSyntax &&
+    (RESERVED_SLUGS.includes(slug as (typeof RESERVED_SLUGS)[number]) ||
+      RESERVED_SLUGS.some((r) => slug.startsWith(r + '/')));
   const slugIsValid = isValidSlug(slug);
   const slugIsDuplicate = slugIsValid && existingSlugs.includes(slug);
   const slugError = !slugIsValid
-    ? 'Slug must start with / and use only lowercase letters, digits, and hyphens (max 40 chars).'
+    ? slugIsReserved
+      ? `Reserved paths (${RESERVED_SLUGS.join(', ')}) can't be used as page slugs.`
+      : 'Slug must start with / and use only lowercase letters, digits, and hyphens (max 40 chars).'
     : slugIsDuplicate
       ? `A page with slug "${slug}" already exists.`
       : null;
@@ -131,6 +151,8 @@ function AddPageModalInner({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
+    // Capture slug/title at submit time; the done-effect reads from the ref.
+    submitContextRef.current = { slug, title: title.trim() };
     setRunKey(`subpage:${siteId}:${slug}:${Date.now()}`);
   }
 

@@ -316,6 +316,7 @@ export function StepGenerate() {
         onClose={() => setAddPageOpen(false)}
         siteId={siteId ?? ''}
         existingSlugs={pages.map((p) => p.slug)}
+        nextPosition={pages.length === 0 ? 0 : Math.max(...pages.map((p) => p.position)) + 1}
         onSuccess={(page) => {
           addPage(page);
           setActiveSlug(page.slug);

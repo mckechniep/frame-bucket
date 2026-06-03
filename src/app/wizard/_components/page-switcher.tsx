@@ -13,15 +13,14 @@ export function PageSwitcher({ pages, activeSlug, onSwitch, onAddPage }: PageSwi
   // Hidden before generation produces any pages.
   if (pages.length === 0) return null;
 
-  // Pages are already sorted by position asc in the store.
-  const sorted = [...pages].sort((a, b) => a.position - b.position);
+  // Pages arrive pre-sorted from the store (setSite/addPage both sort by position).
 
   return (
     <nav
       aria-label="Site pages"
       className="flex items-center gap-[var(--space-2)] overflow-x-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] px-[var(--space-4)] py-[var(--space-2)]"
     >
-      {sorted.map((page) => {
+      {pages.map((page) => {
         const isActive = page.slug === activeSlug;
         return (
           <button
