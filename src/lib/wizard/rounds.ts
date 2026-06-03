@@ -29,7 +29,10 @@ export function roundsForPage(rounds: WizardRound[], pageActiveArtifactId: strin
   // Walk UP from the given artifact to the root, collecting artifactIds
   const chainIds: string[] = [];
   let current: string | null = pageActiveArtifactId;
+  const visited = new Set<string>();
   while (current !== null) {
+    if (visited.has(current)) break; // cycle guard — corrupt parentArtifactId data must not hang
+    visited.add(current);
     const round = byId.get(current);
     if (!round) break;
     chainIds.push(current);

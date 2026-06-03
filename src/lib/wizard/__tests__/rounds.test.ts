@@ -121,4 +121,14 @@ describe('roundsForPage', () => {
 
     expect(input).toEqual(inputCopy);
   });
+
+  // ─── cycle guard ────────────────────────────────────────────────────────────
+
+  it('terminates and does not loop when parentArtifactId forms a cycle', () => {
+    // corrupt data: a-0's parent is a-1, a-1's parent is a-0
+    const r0 = makeRound('a-0', 'a-1', 0);
+    const r1 = makeRound('a-1', 'a-0', 1);
+    const result = roundsForPage([r0, r1], 'a-1');
+    expect(result.length).toBeLessThanOrEqual(2); // must terminate, not hang
+  });
 });
