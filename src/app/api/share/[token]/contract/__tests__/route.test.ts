@@ -181,14 +181,20 @@ describe('GET /api/share/[token]/contract — ?file= validation', () => {
     const res = await GET(makeRequest(VALID_TOKEN), withParams(VALID_TOKEN));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('invalid file param');
+    expect(json).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID', message: 'invalid file param' },
+    });
   });
 
   it('returns 400 when ?file= is unrecognized', async () => {
     const res = await GET(makeRequest(VALID_TOKEN, 'tokens.yaml'), withParams(VALID_TOKEN));
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error).toBe('invalid file param');
+    expect(json).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID', message: 'invalid file param' },
+    });
   });
 });
 
@@ -273,5 +279,27 @@ describe('GET /api/share/[token]/contract — happy path', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('Content-Disposition')).toBe('attachment; filename="site-tokens.json"');
     expect(mockDeriveContract).toHaveBeenCalledWith('artifact-landing-001', 'site');
+  });
+});
+
+describe('GET /api/share/[token]/contract — header-injection regression (public route)', () => {
+  it('sanitizes CRLF and quotes in site name — no raw \\r/\\n/" in Content-Disposition', async () => {
+    // Regression guard: a hostile or corrupted site name must NOT inject header
+    // control characters into the Content-Disposition value on the public route.
+    mockGetSite.mockResolvedValue({
+      ...FAKE_SITE,
+      name: 'evil"\r\nSet-Cookie: x=1',
+    });
+    const res = await GET(makeRequest(VALID_TOKEN, 'contract.md'), withParams(VALID_TOKEN));
+    expect(res.status).toBe(200);
+
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+
+    // The header must contain no raw CR, LF, or double-quote chars originating
+    // from the site name.
+    expect(disposition).not.toMatch(/\r/);
+    expect(disposition).not.toMatch(/\n/);
+    // The filename segment must be the sanitized form of the hostile name.
+    expect(disposition).toBe('attachment; filename="evil-set-cookie-x-1-contract.md"');
   });
 });

@@ -3,6 +3,7 @@ import { defaultShareStore } from '@/lib/shares/share-store-factory';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 import { isValidToken } from '@/lib/shares/token';
 import { deriveContract } from '@/lib/contract/derive';
+import { sanitizeName } from '@/lib/contract/sanitize-name';
 
 export const runtime = 'nodejs';
 
@@ -20,15 +21,6 @@ const CONTENT_TYPES: Record<ContractFile, string> = {
   'tokens.json': 'application/json; charset=utf-8',
   'tokens.css': 'text/css; charset=utf-8',
 };
-
-/**
- * Sanitize a site name to a safe filename prefix.
- * Lowercases, then replaces any run of non-alphanumeric chars with a single dash.
- * e.g. "SmokeYard Studio" → "smokeyard-studio"
- */
-function sanitizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-}
 
 function errorResponse(status: number, code: string, message: string): NextResponse {
   return NextResponse.json({ ok: false, error: { code, message } }, { status });
@@ -60,7 +52,7 @@ export async function GET(
   // ── 2. Validate ?file= param ──────────────────────────────────────────────
   const fileParam = req.nextUrl.searchParams.get('file');
   if (!fileParam || !VALID_FILES.has(fileParam as ContractFile)) {
-    return NextResponse.json({ error: 'invalid file param' }, { status: 400 });
+    return errorResponse(400, 'INVALID', 'invalid file param');
   }
   const file = fileParam as ContractFile;
 

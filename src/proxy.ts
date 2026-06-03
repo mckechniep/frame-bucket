@@ -49,6 +49,8 @@ const PUBLIC_EXACT = new Set(['/', '/favicon.ico', '/robots.txt', '/sitemap.xml'
  * The regex is INTENTIONALLY permissive on the token character set (any
  * alphanumeric run). The route's own isValidToken() (Rule 4) is the real
  * validation gate — it rejects malformed tokens before any DB contact.
+ * It is also permissive on token LENGTH; the route's isValidToken() enforces
+ * the exact 16-char shape.
  */
 const SHARE_CONTRACT_RE = /^\/api\/share\/[A-Za-z0-9]+\/contract$/;
 

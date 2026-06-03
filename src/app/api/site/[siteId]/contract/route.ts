@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 import { deriveContract } from '@/lib/contract/derive';
+import { sanitizeName } from '@/lib/contract/sanitize-name';
 
 export const runtime = 'nodejs';
 
@@ -18,16 +19,6 @@ const CONTENT_TYPES: Record<ContractFile, string> = {
   'tokens.json': 'application/json; charset=utf-8',
   'tokens.css': 'text/css; charset=utf-8',
 };
-
-/**
- * Sanitize a site name to a safe filename prefix.
- * Lowercases, then replaces any run of non-alphanumeric chars with a single dash.
- * e.g. "SmokeYard Studio" → "smokeyard-studio"
- *      "My Brand! v2.0"   → "my-brand--v2-0"
- */
-function sanitizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-}
 
 /**
  * GET /api/site/[siteId]/contract
