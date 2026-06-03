@@ -598,6 +598,51 @@ describe('wizard store', () => {
       expect(useWizardStore.getState().activeSlug).toBe('/');
     });
 
+    test('keeps subpage whose artifactId IS included in existingIds (hydrator bug regression)', async () => {
+      // Regression: wizard-hydrator previously sent only round artifactIds to
+      // /api/artifact/exists. Because subpages are added via addPage (not
+      // appendRound), their artifactIds were never in the queried set, so
+      // hydrateAndValidate treated every subpage as an orphan and dropped it.
+      // The fix unions page artifactIds into the query; this test verifies the
+      // store-level survival logic is correct when the full union is passed.
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-root' }));
+      useWizardStore
+        .getState()
+        .addPage({ slug: '/', title: 'Home', artifactId: 'a-root', position: 0 });
+      useWizardStore
+        .getState()
+        .addPage({ slug: '/about', title: 'About', artifactId: 'a-sub', position: 1 });
+
+      // Both artifactIds passed — simulates the FIXED hydrator behaviour.
+      const dropped = useWizardStore.getState().hydrateAndValidate(['a-root', 'a-sub']);
+
+      expect(dropped).toBe(0);
+      const { pages } = useWizardStore.getState();
+      expect(pages.map((p) => p.slug)).toEqual(['/', '/about']);
+    });
+
+    test('drops subpage when its artifactId is absent from existingIds (old hydrator bug scenario)', async () => {
+      // Demonstrates the BUG: if the hydrator only passed round ids (omitting
+      // page ids), hydrateAndValidate would drop the /about subpage because
+      // 'a-sub' is not in the existence-check result set.
+      const { useWizardStore } = await importFreshStore();
+      useWizardStore.getState().appendRound(makeRound({ artifactId: 'a-root' }));
+      useWizardStore
+        .getState()
+        .addPage({ slug: '/', title: 'Home', artifactId: 'a-root', position: 0 });
+      useWizardStore
+        .getState()
+        .addPage({ slug: '/about', title: 'About', artifactId: 'a-sub', position: 1 });
+
+      // Only round ids passed — simulates the BROKEN hydrator behaviour.
+      useWizardStore.getState().hydrateAndValidate(['a-root']);
+
+      const { pages } = useWizardStore.getState();
+      // /about is gone because 'a-sub' was not included in the existence check.
+      expect(pages.map((p) => p.slug)).toEqual(['/']);
+    });
+
     test('still returns dropped-rounds count and existing round-drop behavior is unchanged', async () => {
       const { useWizardStore } = await importFreshStore();
       useWizardStore.getState().appendRound(makeRound({ artifactId: 'r-1' }));

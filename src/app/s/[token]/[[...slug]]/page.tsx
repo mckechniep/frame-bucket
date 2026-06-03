@@ -41,7 +41,7 @@ export default async function SharePage({
     return (
       <>
         <RevokedView name={share.name} revokedAt={share.revokedAt} />
-        <ShareFooter token={token} />
+        <ShareFooter />
       </>
     );
   }

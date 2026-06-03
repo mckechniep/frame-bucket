@@ -51,7 +51,9 @@ export function WizardHydrator() {
     if (hasRunRef.current) return;
     hasRunRef.current = true;
 
-    const initialIds = useWizardStore.getState().rounds.map((r) => r.artifactId);
+    const roundIds = useWizardStore.getState().rounds.map((r) => r.artifactId);
+    const pageIds = useWizardStore.getState().pages.map((p) => p.artifactId);
+    const initialIds = [...new Set([...roundIds, ...pageIds])];
     if (initialIds.length === 0) return;
 
     const abort = new AbortController();
