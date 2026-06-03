@@ -19,6 +19,8 @@ export const IterationRequestSchema = z.object({
   previousHtml: z.string().optional(),
   previousArtifactId: z.string().min(1),
   feedback: z.string().min(10).max(1000),
+  siteId: z.string().optional(),
+  slug: z.string().optional(),
 });
 
 // ---------------------------------------------------------------------------

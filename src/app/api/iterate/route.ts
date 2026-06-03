@@ -5,6 +5,7 @@ import { getAnthropicClient } from '@/lib/anthropic/client';
 import { defaultArchiveStore } from '@/lib/generation/archive';
 import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
+import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -107,6 +108,7 @@ export async function POST(req: NextRequest) {
       };
 
       let html = '';
+      let archiveId: string | undefined;
       const usage: UsageTracking = {
         inputTokens: 0,
         outputTokens: 0,
@@ -164,7 +166,7 @@ export async function POST(req: NextRequest) {
         // Archive with parent linking and iteration round.
         // The archive's save() strips any existing "(iter N)" suffix from
         // recipeSummary and appends the new round label since childRound > 0.
-        const artifactId = await archive.save({
+        archiveId = await archive.save({
           recipeSummary: parent.recipeSummary,
           html,
           htmlSource,
@@ -178,7 +180,29 @@ export async function POST(req: NextRequest) {
           iterationRound: childRound,
         });
 
-        send('done', { artifactId, usage, cost, imagesInjected: placeholderCount, html });
+        // Advance the page pointer so the wizard's "latest = active" model holds.
+        // Both fields are optional — older callers and direct CLI usage may omit
+        // them. When present, a null return means the site/slug is unknown;
+        // warn but don't fail — the artifact is already saved and the done event
+        // must still fire. If setPageArtifact throws (DB error), the catch block
+        // will carry archiveId so the saved artifact is recoverable.
+        const { siteId, slug } = request;
+        if (siteId && slug) {
+          const updated = await defaultSiteStore().setPageArtifact(siteId, slug, archiveId);
+          if (!updated) {
+            console.warn(
+              `[iterate] setPageArtifact found no page for site=${siteId} slug=${slug}; artifact saved but page pointer not advanced`,
+            );
+          }
+        }
+
+        send('done', {
+          artifactId: archiveId,
+          usage,
+          cost,
+          imagesInjected: placeholderCount,
+          html,
+        });
       } catch (err) {
         // [Kill-switch point 5] Client disconnects (page reload, AbortController
         // cleanup) surface as AbortError. Do NOT save an archive and do NOT
@@ -186,7 +210,12 @@ export async function POST(req: NextRequest) {
         if (err instanceof Error && (err.name === 'AbortError' || req.signal.aborted)) {
           return;
         }
-        send('error', { error: errorMessage(err) });
+        // Include archiveId if archive.save succeeded before the failure —
+        // the saved artifact is otherwise an unreachable zombie with no recovery path.
+        send('error', {
+          error: errorMessage(err),
+          ...(archiveId ? { artifactId: archiveId } : {}),
+        });
       } finally {
         try {
           controller.close();

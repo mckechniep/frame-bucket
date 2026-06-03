@@ -169,3 +169,64 @@ describe('IterationRequestSchema — other required fields', () => {
     ).toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// IterationRequestSchema — optional siteId + slug fields (Task 16)
+// ---------------------------------------------------------------------------
+
+describe('IterationRequestSchema — siteId + slug optional fields', () => {
+  it('accepts a body WITH siteId and slug', () => {
+    const result = IterationRequestSchema.parse({
+      ...validRequest,
+      siteId: 'site-deadbeef0001',
+      slug: '/',
+    });
+    expect(result.siteId).toBe('site-deadbeef0001');
+    expect(result.slug).toBe('/');
+  });
+
+  it('accepts a body WITHOUT siteId and slug (backward-compat)', () => {
+    const result = IterationRequestSchema.parse(validRequest);
+    expect(result.siteId).toBeUndefined();
+    expect(result.slug).toBeUndefined();
+  });
+
+  it('accepts a body with siteId but no slug', () => {
+    const result = IterationRequestSchema.parse({ ...validRequest, siteId: 'site-abc' });
+    expect(result.siteId).toBe('site-abc');
+    expect(result.slug).toBeUndefined();
+  });
+
+  it('accepts a body with slug but no siteId', () => {
+    const result = IterationRequestSchema.parse({ ...validRequest, slug: '/about' });
+    expect(result.slug).toBe('/about');
+    expect(result.siteId).toBeUndefined();
+  });
+
+  it('still rejects a body missing the required recipe field', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { recipe: _omit, ...withoutRecipe } = validRequest;
+    expect(() =>
+      IterationRequestSchema.parse({ ...withoutRecipe, siteId: 'site-x', slug: '/' }),
+    ).toThrow();
+  });
+
+  it('still rejects a body missing the required previousArtifactId field', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { previousArtifactId: _omit, ...withoutId } = validRequest;
+    expect(() =>
+      IterationRequestSchema.parse({ ...withoutId, siteId: 'site-x', slug: '/' }),
+    ).toThrow();
+  });
+
+  it('still rejects feedback shorter than 10 chars even with siteId+slug present', () => {
+    expect(() =>
+      IterationRequestSchema.parse({
+        ...validRequest,
+        feedback: 'too short',
+        siteId: 'site-x',
+        slug: '/',
+      }),
+    ).toThrow();
+  });
+});
