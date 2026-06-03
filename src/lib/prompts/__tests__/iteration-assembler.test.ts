@@ -157,6 +157,23 @@ describe('assembleIterationRequest', () => {
     expect(req.messages[0]?.role).toBe('user');
   });
 
+  it('user message contains nav-links preservation instruction', async () => {
+    const req = await assembleIterationRequest(baseRequest);
+    const content = req.messages[0]?.content ?? '';
+    expect(content).toContain('fb:nav-links:start');
+    expect(content).toContain('fb:nav-links:end');
+    expect(content).toContain('Preserve');
+  });
+
+  it('nav marker preservation instruction lives in user content, not in any cached system block', async () => {
+    const req = await assembleIterationRequest(baseRequest);
+    const cachedBlocks = req.system.filter((b) => b.cache_control?.type === 'ephemeral');
+    for (const block of cachedBlocks) {
+      expect(block.text).not.toContain('fb:nav-links');
+    }
+    expect(req.messages[0]?.content ?? '').toContain('fb:nav-links');
+  });
+
   it('includes interaction and system in recipe summary when present', async () => {
     const requestWithExtras: IterationRequest = {
       ...baseRequest,

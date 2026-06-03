@@ -7,7 +7,8 @@ import { formatBrief } from './format-brief';
 const ITERATION_DIRECTIVE =
   'Regenerate the full HTML, applying the feedback while preserving everything that works. ' +
   'Output the complete new HTML document, beginning with `<!DOCTYPE html>` and ending with `</html>`. ' +
-  'No markdown fences, no commentary.';
+  'No markdown fences, no commentary. ' +
+  'Preserve the <!-- fb:nav-links:start --> and <!-- fb:nav-links:end --> navigation marker comments and the anchor structure between them exactly as they appear in the previous version.';
 
 function formatRecipeSummary(recipe: Recipe): string {
   const parts = [

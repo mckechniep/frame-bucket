@@ -55,7 +55,12 @@ function formatRecipe(recipe: Recipe): string {
 const GENERATION_DIRECTIVE = `Produce one complete, self-contained HTML file for this recipe.
 Apply the craft canon rigorously. Apply the aesthetic override if present.
 Obey the output contract strictly.
-Output ONLY the file. No commentary, no markdown fences, no explanations.`;
+Output ONLY the file. No commentary, no markdown fences, no explanations.
+Include a site navigation element appropriate to your design (it may be visually minimal). Wrap ONLY the navigation link anchors — not the surrounding <nav> or container — in these exact HTML comment markers:
+<!-- fb:nav-links:start -->
+<a href="/">...</a>
+<!-- fb:nav-links:end -->
+This page is currently the only page of its site, so render a single link with href="/" labeled with the project/site name. Do not omit these markers.`;
 
 export async function assembleGenerationRequest(recipe: Recipe): Promise<AnthropicRequest> {
   const layers = await loadCanonLayers(recipe);
