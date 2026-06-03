@@ -63,6 +63,14 @@ describe('deriveSlug', () => {
     expect(deriveSlug('S')).toBe('/s-page');
     expect(deriveSlug('Admin')).toBe('/admin-page');
   });
+
+  it('falls back to /page for non-ASCII-only strings', () => {
+    expect(deriveSlug('日本語ページ')).toBe('/page');
+  });
+
+  it('appends -page to /generate when derived from title', () => {
+    expect(deriveSlug('Generate')).toBe('/generate-page');
+  });
 });
 
 describe('isValidSlug', () => {
@@ -112,6 +120,14 @@ describe('isValidSlug', () => {
     it('rejects double slashes', () => {
       expect(isValidSlug('//about')).toBe(false);
       expect(isValidSlug('/about//us')).toBe(false);
+    });
+
+    it('rejects leading hyphen in slug body', () => {
+      expect(isValidSlug('/-about')).toBe(false);
+    });
+
+    it('rejects trailing hyphen in slug body', () => {
+      expect(isValidSlug('/about-')).toBe(false);
     });
 
     it('rejects strings longer than 40 chars', () => {
@@ -172,6 +188,7 @@ describe('isValidSlug', () => {
         'About Us',
         'Pricing & Plans!',
         'Über uns',
+        '日本語ページ',
         '',
         '!!!',
         'Contact',
@@ -183,6 +200,7 @@ describe('isValidSlug', () => {
         'Shares',
         'Wizard',
         'Preview',
+        'Generate',
       ];
 
       testCases.forEach((title) => {
@@ -215,6 +233,7 @@ describe('isValidSlug', () => {
       expect(RESERVED_SLUGS).toContain('/shares');
       expect(RESERVED_SLUGS).toContain('/wizard');
       expect(RESERVED_SLUGS).toContain('/preview');
+      expect(RESERVED_SLUGS).toContain('/generate');
     });
   });
 });

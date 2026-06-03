@@ -1,8 +1,16 @@
-/** Matches "/" or "/lowercase-and-digits". Max total length 40. */
-export const SLUG_REGEX = /^\/[a-z0-9-]*$/;
+/** Matches "/" or "/body" where body starts/ends with [a-z0-9] and may contain single hyphens between. */
+export const SLUG_REGEX = /^\/([a-z0-9]([a-z0-9-]*[a-z0-9])?)?$/;
 
 /** Slugs that collide with app routes and can never be page slugs. */
-export const RESERVED_SLUGS = ['/api', '/s', '/admin', '/shares', '/wizard', '/preview'];
+export const RESERVED_SLUGS = [
+  '/api',
+  '/s',
+  '/admin',
+  '/shares',
+  '/wizard',
+  '/preview',
+  '/generate',
+] as const;
 
 /**
  * Derives a URL slug from a title string.
@@ -39,7 +47,7 @@ export function deriveSlug(title: string): string {
   }
 
   // 4. If result is a reserved slug, append -page to make it valid
-  if (RESERVED_SLUGS.includes(slug)) {
+  if (RESERVED_SLUGS.includes(slug as (typeof RESERVED_SLUGS)[number])) {
     slug = slug + '-page';
   }
 
@@ -48,8 +56,9 @@ export function deriveSlug(title: string): string {
 
 /**
  * Type guard: validates that the input is a valid page slug.
+ * Called by page-slug route handlers and the wizard before any DB lookup — Rule 4.
  * - Must be a string
- * - Must match SLUG_REGEX (starts with /, only [a-z0-9-])
+ * - Must match SLUG_REGEX (starts with /, body must start/end with [a-z0-9])
  * - Must be <= 40 chars
  * - Must not be a reserved slug exactly
  * - Must not start with a reserved slug prefix + "/"
@@ -76,7 +85,7 @@ export function isValidSlug(s: unknown): s is string {
   }
 
   // Reserved slug check (exact match)
-  if (RESERVED_SLUGS.includes(s)) {
+  if (RESERVED_SLUGS.includes(s as (typeof RESERVED_SLUGS)[number])) {
     return false;
   }
 
