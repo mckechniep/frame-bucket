@@ -1,4 +1,4 @@
-import type { CreateShareInput, ShareRecord, ShareStore } from './share-store';
+import type { CreateShareInput, SharePageSnapshot, ShareRecord, ShareStore } from './share-store';
 import { generateShareToken } from './token';
 import { supabaseServer } from '@/lib/supabase/client-server';
 
@@ -12,42 +12,124 @@ type ShareRow = {
   created_at: string;
 };
 
+type SharePageRow = {
+  token: string;
+  slug: string;
+  title: string;
+  artifact_id: string;
+  position: number;
+};
+
 export class SupabaseShareStore implements ShareStore {
   async create(input: CreateShareInput): Promise<ShareRecord> {
     const sb = supabaseServer();
     const token = generateShareToken();
-    // TRANSITIONAL SHIM (M6 Task 14 replaces this with real site-scoped writes):
-    // - New path `{ siteId, name, pages }`: siteId goes into the DB column;
-    //   pages snapshot storage is added in Task 14.
-    // - Legacy path `{ artifactId, name }`: writes an empty string as site_id
-    //   (semantically wrong; the FK to sites(id) means this would fail on real
-    //   data — dev uses MemoryShareStore so this is never exercised).
-    // Task 19 removes the legacy path entirely.
-    const siteId = 'siteId' in input ? input.siteId : '';
+
+    if ('siteId' in input) {
+      // New site-scoped path: insert shares row + share_pages rows.
+      const { error: shareErr } = await sb
+        .from('shares')
+        .insert({ token, site_id: input.siteId, name: input.name });
+      if (shareErr) throw new Error(`SupabaseShareStore.create (shares): ${shareErr.message}`);
+
+      // Batch-insert all page snapshots.
+      const pageRows = input.pages.map((p, i) => ({
+        token,
+        slug: p.slug,
+        title: p.title,
+        artifact_id: p.artifactId,
+        position: p.position ?? i,
+      }));
+
+      const { error: pagesErr } = await sb.from('share_pages').insert(pageRows);
+      if (pagesErr) {
+        // Manual rollback: delete the shares row we just inserted so we don't
+        // leave an orphan share with no pages. Supabase JS has no transactions.
+        await sb.from('shares').delete().eq('token', token);
+        throw new Error(`SupabaseShareStore.create (share_pages): ${pagesErr.message}`);
+      }
+
+      // Re-fetch the shares row so created_at and other DB-set fields are accurate.
+      const { data: shareData, error: fetchErr } = await sb
+        .from('shares')
+        .select('*')
+        .eq('token', token)
+        .single();
+      if (fetchErr) throw new Error(`SupabaseShareStore.create (fetch): ${fetchErr.message}`);
+
+      return rowToRecord(shareData as ShareRow, input.pages);
+    }
+
+    // TRANSITIONAL SHIM — legacy `{ artifactId, name }` path.
+    // Writes site_id = artifactId, no share_pages rows.
+    // Task 19 removes this branch entirely.
     const { data, error } = await sb
       .from('shares')
-      .insert({ token, site_id: siteId, name: input.name })
+      .insert({ token, site_id: input.artifactId, name: input.name })
       .select('*')
       .single();
     if (error) throw new Error(`SupabaseShareStore.create: ${error.message}`);
-    return rowToRecord(data);
+    return rowToRecord(data as ShareRow, []);
   }
 
   async findByToken(token: string): Promise<ShareRecord | null> {
     const sb = supabaseServer();
-    const { data, error } = await sb.from('shares').select('*').eq('token', token).maybeSingle();
-    if (error) throw new Error(`SupabaseShareStore.findByToken: ${error.message}`);
-    return data ? rowToRecord(data) : null;
+
+    const { data: shareData, error: shareErr } = await sb
+      .from('shares')
+      .select('*')
+      .eq('token', token)
+      .maybeSingle();
+    if (shareErr) throw new Error(`SupabaseShareStore.findByToken: ${shareErr.message}`);
+    if (!shareData) return null;
+
+    const { data: pageData, error: pageErr } = await sb
+      .from('share_pages')
+      .select('*')
+      .eq('token', token)
+      .order('position', { ascending: true });
+    if (pageErr) throw new Error(`SupabaseShareStore.findByToken (pages): ${pageErr.message}`);
+
+    const pages = pageRowsToSnapshots((pageData ?? []) as SharePageRow[]);
+    return rowToRecord(shareData as ShareRow, pages);
   }
 
   async list(): Promise<ShareRecord[]> {
     const sb = supabaseServer();
-    const { data, error } = await sb
+
+    const { data: sharesData, error: sharesErr } = await sb
       .from('shares')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error) throw new Error(`SupabaseShareStore.list: ${error.message}`);
-    return (data ?? []).map(rowToRecord);
+    if (sharesErr) throw new Error(`SupabaseShareStore.list: ${sharesErr.message}`);
+
+    const shares = (sharesData ?? []) as ShareRow[];
+    if (shares.length === 0) return [];
+
+    // Single round-trip for all pages — NOT N queries.
+    const tokens = shares.map((s) => s.token);
+    const { data: pagesData, error: pagesErr } = await sb
+      .from('share_pages')
+      .select('*')
+      .in('token', tokens)
+      .order('position', { ascending: true });
+    if (pagesErr) throw new Error(`SupabaseShareStore.list (pages): ${pagesErr.message}`);
+
+    // Group pages by token in JS.
+    const pagesByToken = new Map<string, SharePageRow[]>();
+    for (const page of (pagesData ?? []) as SharePageRow[]) {
+      const existing = pagesByToken.get(page.token);
+      if (existing) {
+        existing.push(page);
+      } else {
+        pagesByToken.set(page.token, [page]);
+      }
+    }
+
+    return shares.map((row) => {
+      const pages = pageRowsToSnapshots(pagesByToken.get(row.token) ?? []);
+      return rowToRecord(row, pages);
+    });
   }
 
   async rename(token: string, name: string): Promise<ShareRecord | null> {
@@ -59,7 +141,18 @@ export class SupabaseShareStore implements ShareStore {
       .select('*')
       .maybeSingle();
     if (error) throw new Error(`SupabaseShareStore.rename: ${error.message}`);
-    return data ? rowToRecord(data) : null;
+    if (!data) return null;
+
+    // Fetch pages so the returned record is fully populated.
+    const { data: pageData, error: pageErr } = await sb
+      .from('share_pages')
+      .select('*')
+      .eq('token', token)
+      .order('position', { ascending: true });
+    if (pageErr) throw new Error(`SupabaseShareStore.rename (pages): ${pageErr.message}`);
+
+    const pages = pageRowsToSnapshots((pageData ?? []) as SharePageRow[]);
+    return rowToRecord(data as ShareRow, pages);
   }
 
   /**
@@ -77,6 +170,7 @@ export class SupabaseShareStore implements ShareStore {
     const existing = await this.findByToken(token);
     if (!existing) return null;
     if (existing.revokedAt) return existing;
+
     const sb = supabaseServer();
     const { data, error } = await sb
       .from('shares')
@@ -85,7 +179,18 @@ export class SupabaseShareStore implements ShareStore {
       .select('*')
       .maybeSingle();
     if (error) throw new Error(`SupabaseShareStore.revoke: ${error.message}`);
-    return data ? rowToRecord(data) : null;
+    if (!data) return null;
+
+    // Fetch pages so the returned record is fully populated.
+    const { data: pageData, error: pageErr } = await sb
+      .from('share_pages')
+      .select('*')
+      .eq('token', token)
+      .order('position', { ascending: true });
+    if (pageErr) throw new Error(`SupabaseShareStore.revoke (pages): ${pageErr.message}`);
+
+    const pages = pageRowsToSnapshots((pageData ?? []) as SharePageRow[]);
+    return rowToRecord(data as ShareRow, pages);
   }
 
   /**
@@ -151,16 +256,23 @@ export class SupabaseShareStore implements ShareStore {
   }
 }
 
-function rowToRecord(row: ShareRow): ShareRecord {
-  // TRANSITIONAL SHIM (M6 Task 14 replaces this):
-  // - siteId maps from site_id column.
-  // - pages is empty until Task 14 adds the snapshot column and reads it.
-  // - artifactId carries site_id for backward compat with callers that still
-  //   read the deprecated field (Tasks 15-19 migrate them; Task 19 removes it).
+function pageRowsToSnapshots(rows: SharePageRow[]): SharePageSnapshot[] {
+  return rows.map((r) => ({
+    slug: r.slug,
+    title: r.title,
+    artifactId: r.artifact_id,
+    position: r.position,
+  }));
+}
+
+function rowToRecord(row: ShareRow, pages: SharePageSnapshot[]): ShareRecord {
   return {
     token: row.token,
     siteId: row.site_id,
-    pages: [],
+    pages,
+    // TRANSITIONAL SHIM: artifactId carries site_id for backward compat with
+    // callers that still read the deprecated field (Tasks 15-19 migrate them;
+    // Task 19 removes this field and the legacy create path entirely).
     artifactId: row.site_id,
     name: row.name,
     revokedAt: row.revoked_at,
