@@ -8,20 +8,28 @@ interface SiteFile {
   pages: SitePage[];
 }
 
-const DEFAULT_BASE_DIR = path.join(process.cwd(), 'tmp', 'sites');
-
+/**
+ * Filesystem-backed SiteStore.
+ *
+ * Each site is stored as a single JSON file: `<baseDir>/<siteId>.json`.
+ * Writes are atomic (write-to-temp then rename) to prevent torn files on crash.
+ *
+ * NOT safe for concurrent writes to the same site (read-modify-write races).
+ * Acceptable for single-operator local dev; use SupabaseSiteStore in production.
+ */
 export class FsSiteStore implements SiteStore {
   private readonly baseDir: string;
 
-  constructor(baseDir: string = DEFAULT_BASE_DIR) {
-    this.baseDir = baseDir;
+  constructor(baseDir?: string) {
+    // Resolve cwd at construction time, not import time.
+    this.baseDir = baseDir ?? path.join(process.cwd(), 'tmp', 'sites');
   }
 
   async createSite({ name }: { name: string }): Promise<SiteRecord> {
     const id = 'site-' + crypto.randomBytes(6).toString('hex');
     const now = new Date().toISOString();
     const site: SiteRecord = { id, name, createdAt: now, updatedAt: now };
-    const file: SiteFile = { site, pages: [] };
+    const file: SiteFile = { site: { ...site }, pages: [] }; // store a copy, not a live reference
     await this.writeFile(id, file);
     return { ...site };
   }
@@ -95,7 +103,7 @@ export class FsSiteStore implements SiteStore {
   private async readFile(siteId: string): Promise<SiteFile | null> {
     try {
       const raw = await fs.readFile(this.filePath(siteId), 'utf-8');
-      return JSON.parse(raw) as SiteFile;
+      return JSON.parse(raw) as SiteFile; // No runtime shape validation — assumes files were written by this class.
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw err;
@@ -104,6 +112,9 @@ export class FsSiteStore implements SiteStore {
 
   private async writeFile(siteId: string, data: SiteFile): Promise<void> {
     await fs.mkdir(this.baseDir, { recursive: true });
-    await fs.writeFile(this.filePath(siteId), JSON.stringify(data, null, 2) + '\n', 'utf-8');
+    const target = this.filePath(siteId);
+    const tmp = target + '.tmp';
+    await fs.writeFile(tmp, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+    await fs.rename(tmp, target); // atomic on same filesystem — no torn/truncated files
   }
 }

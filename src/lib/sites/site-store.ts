@@ -74,6 +74,6 @@ export interface SiteStore {
    */
   setPageArtifact(siteId: string, slug: string, artifactId: string): Promise<SitePage | null>;
 
-  /** Returns all pages for the site, ordered by position ascending. */
+  /** Returns all pages for the site, ordered by position ascending. Returns [] if the site does not exist. */
   listPages(siteId: string): Promise<SitePage[]>;
 }

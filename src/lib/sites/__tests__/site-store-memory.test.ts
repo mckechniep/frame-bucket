@@ -78,6 +78,11 @@ describe('MemorySiteStore', () => {
       const site = await store.createSite({ name: 'Empty' });
       expect(await store.listPages(site.id)).toEqual([]);
     });
+
+    it('listPages returns empty array for an unknown siteId', async () => {
+      const store = new MemorySiteStore();
+      expect(await store.listPages('site-000000000000')).toEqual([]);
+    });
   });
 
   describe('addPage error cases', () => {
