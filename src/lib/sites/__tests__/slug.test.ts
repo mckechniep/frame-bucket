@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveSlug, isValidSlug, SLUG_REGEX, RESERVED_SLUGS } from '../slug';
+import { deriveSlug, isValidSlug, normalizeSlugParts, SLUG_REGEX, RESERVED_SLUGS } from '../slug';
 
 describe('deriveSlug', () => {
   it('converts title to lowercase and hyphens', () => {
@@ -207,6 +207,32 @@ describe('isValidSlug', () => {
         const slug = deriveSlug(title);
         expect(isValidSlug(slug), `deriveSlug('${title}') = '${slug}' should be valid`).toBe(true);
       });
+    });
+  });
+
+  describe('normalizeSlugParts', () => {
+    it('returns "/" for undefined', () => {
+      expect(normalizeSlugParts(undefined)).toBe('/');
+    });
+
+    it('returns "/" for empty array', () => {
+      expect(normalizeSlugParts([])).toBe('/');
+    });
+
+    it('returns "/about" for ["about"]', () => {
+      expect(normalizeSlugParts(['about'])).toBe('/about');
+    });
+
+    it('returns "/team/bios" for ["team", "bios"]', () => {
+      expect(normalizeSlugParts(['team', 'bios'])).toBe('/team/bios');
+    });
+
+    it('handles single segment that is the root word', () => {
+      expect(normalizeSlugParts(['contact'])).toBe('/contact');
+    });
+
+    it('handles three segments', () => {
+      expect(normalizeSlugParts(['a', 'b', 'c'])).toBe('/a/b/c');
     });
   });
 

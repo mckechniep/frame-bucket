@@ -55,6 +55,21 @@ export function deriveSlug(title: string): string {
 }
 
 /**
+ * Maps Next.js catch-all segments to a page slug.
+ *
+ *   undefined or [] → '/'  (landing page — no extra path segments)
+ *   ['about']       → '/about'
+ *   ['team','bios'] → '/team/bios'
+ *
+ * Called by the [[...slug]] share viewer to convert Next's segment array into
+ * the canonical slug stored in share.pages[].slug. Pure; never throws.
+ */
+export function normalizeSlugParts(parts: string[] | undefined): string {
+  if (!parts || parts.length === 0) return '/';
+  return '/' + parts.join('/');
+}
+
+/**
  * Type guard: validates that the input is a valid page slug.
  * Called by page-slug route handlers and the wizard before any DB lookup — Rule 4.
  * - Must be a string
