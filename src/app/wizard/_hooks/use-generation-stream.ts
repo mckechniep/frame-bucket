@@ -30,7 +30,16 @@ import { dedupedRequest } from '@/lib/wizard/deduped-request';
 
 export type GenerationStreamRequest =
   | { kind: 'generate'; recipe: Recipe }
-  | { kind: 'iterate'; recipe: Recipe; previousArtifactId: string; feedback: string }
+  | {
+      kind: 'iterate';
+      recipe: Recipe;
+      previousArtifactId: string;
+      feedback: string;
+      /** Optional — when provided, the route also advances site_pages.artifact_id server-side. */
+      siteId?: string;
+      /** Optional — must be paired with siteId to advance the page pointer. */
+      slug?: string;
+    }
   | { kind: 'subpage'; siteId: string; slug: string; title: string; brief: string };
 
 export type StreamPhase = 'idle' | 'streaming' | 'images' | 'done' | 'error';
@@ -104,6 +113,10 @@ export function useGenerationStream(
               recipe: request.recipe,
               previousArtifactId: request.previousArtifactId,
               feedback: request.feedback,
+              // When present, the route also advances site_pages.artifact_id
+              // server-side so the page pointer stays in sync.
+              ...(request.siteId ? { siteId: request.siteId } : {}),
+              ...(request.slug ? { slug: request.slug } : {}),
             };
 
     const { promise, release } = dedupedRequest(`${request.kind}:${runKey}`, async (signal) => {

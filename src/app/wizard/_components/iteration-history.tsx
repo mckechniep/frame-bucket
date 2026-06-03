@@ -6,6 +6,7 @@ import { Link2 } from 'lucide-react';
 
 import type { ShareRecord } from '@/lib/shares/share-store';
 import { useWizardStore, type WizardRound } from '@/lib/wizard/store';
+import { roundsForPage } from '@/lib/wizard/rounds';
 
 import { CheckpointNameModal } from './checkpoint-name-modal';
 
@@ -44,6 +45,12 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
   // matches step-generate's preview-pane fallback logic.
   const effectiveActiveId = activeArtifactId ?? rounds[rounds.length - 1]!.artifactId;
 
+  // For multi-page sites, filter to the active page's iteration chain only.
+  // roundsForPage walks UP from the active artifact via parentArtifactId links
+  // to the root, then returns that chain sorted by iterationRound asc.
+  // For a single-page site this returns the same full chain as before (no regression).
+  const pageRounds = roundsForPage(rounds, effectiveActiveId);
+
   const namingRound = namingArtifactId
     ? (rounds.find((r) => r.artifactId === namingArtifactId) ?? null)
     : null;
@@ -64,12 +71,12 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
           History
         </h2>
         <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums text-[var(--color-ink-muted)]">
-          {rounds.length}
+          {pageRounds.length}
         </span>
       </header>
 
       <ol className="flex flex-col gap-[var(--space-2)]">
-        {rounds.map((round) => {
+        {pageRounds.map((round) => {
           const isActive = round.artifactId === effectiveActiveId;
           const isComparing = compareWithArtifactId === round.artifactId;
           return (

@@ -47,6 +47,7 @@ export function StepGenerate() {
   const setSite = useWizardStore((s) => s.setSite);
   const addPage = useWizardStore((s) => s.addPage);
   const setActiveSlug = useWizardStore((s) => s.setActiveSlug);
+  const setPageArtifact = useWizardStore((s) => s.setPageArtifact);
   const siteId = useWizardStore((s) => s.siteId);
   const pages = useWizardStore((s) => s.pages);
   const activeSlug = useWizardStore((s) => s.activeSlug);
@@ -107,6 +108,9 @@ export function StepGenerate() {
         cost: stream.cost ?? 0,
         generatedAt: new Date().toISOString(),
       });
+      // Advance the active page's stored artifact pointer so switching away
+      // from and back to this page shows the iterated artifact, not the original.
+      setPageArtifact(activeSlug, stream.artifactId);
       iterationContextRef.current = null;
     } else {
       appendRound({
@@ -137,9 +141,11 @@ export function StepGenerate() {
     rounds,
     pages.length,
     selectedRecipe,
+    activeSlug,
     appendRound,
     setActiveArtifactId,
     setSite,
+    setPageArtifact,
   ]);
 
   const handleRefine = useCallback(
@@ -163,10 +169,14 @@ export function StepGenerate() {
           recipe: selectedRecipe,
           previousArtifactId: latest.artifactId,
           feedback,
+          // Pass site context so the route advances site_pages.artifact_id
+          // server-side alongside the client-side setPageArtifact call.
+          ...(siteId ? { siteId } : {}),
+          ...(activeSlug ? { slug: activeSlug } : {}),
         },
       });
     },
-    [selectedRecipe, rounds],
+    [selectedRecipe, rounds, siteId, activeSlug],
   );
 
   const handleSwitch = useCallback(
