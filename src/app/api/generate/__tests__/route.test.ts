@@ -84,36 +84,37 @@ import { assembleGenerationRequest } from '@/lib/prompts/assembler';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Minimal Recipe fixture. */
+/** Minimal Recipe fixture — all fields satisfy RecipeSchema (TaxonomyEntrySchema requires non-empty strings). */
 function makeRecipe(projectName = 'Test Project'): Recipe {
   return {
     brief: {
       projectName,
       industry: 'tech',
       posture: 'startup',
+      description: 'A test project for unit testing.',
     },
     aesthetic: {
       id: 'aesthetic-1',
       name: 'Aesthetic',
       bucket: 'aesthetic',
-      shortDefinition: '',
-      coreMood: '',
-      bestUseCase: '',
-      distinctiveSignals: [],
+      shortDefinition: 'Bold and expressive',
+      coreMood: 'Energetic',
+      bestUseCase: 'Startups',
+      distinctiveSignals: ['strong typography'],
       notes: '',
-      notionId: '',
+      notionId: 'notion-aes-1',
       hasOverride: false,
     },
     layout: {
       id: 'layout-1',
       name: 'Layout',
       bucket: 'layout',
-      shortDefinition: '',
-      coreMood: '',
-      bestUseCase: '',
-      distinctiveSignals: [],
+      shortDefinition: 'Grid-based layout',
+      coreMood: 'Structured',
+      bestUseCase: 'Landing pages',
+      distinctiveSignals: ['clean grid'],
       notes: '',
-      notionId: '',
+      notionId: 'notion-lay-1',
       hasOverride: false,
     },
   };
@@ -157,18 +158,10 @@ async function* makeChunks(html: string) {
  * An async generator that immediately throws an AbortError, simulating the
  * Anthropic SDK throwing when the request signal fires.
  */
-
-async function* makeAbortChunks(_html: string) {
+async function* makeAbortChunks() {
   const e = new Error('Request was aborted.');
   e.name = 'AbortError';
   throw e;
-  // Unreachable yield to satisfy the generator return type.
-  yield {
-    type: 'message_start' as const,
-    message: {
-      usage: { input_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
-    },
-  };
 }
 
 /** Build a NextRequest with an optional AbortSignal. */
@@ -378,7 +371,7 @@ describe('POST /api/generate — happy path (site creation)', () => {
 describe('POST /api/generate — Rule 9: abort path creates NO artifact and NO site', () => {
   it('does NOT call archive.save or createSite when the stream throws AbortError', async () => {
     // Simulate the Anthropic SDK throwing AbortError (client disconnected).
-    mockStream.mockReturnValue(makeAbortChunks('<h1>Never saved</h1>'));
+    mockStream.mockReturnValue(makeAbortChunks());
 
     const res = await POST(makeRequest(makeRecipe()));
 
@@ -400,7 +393,7 @@ describe('POST /api/generate — Rule 9: abort path creates NO artifact and NO s
   });
 
   it('does NOT emit an error event on AbortError (client already gone)', async () => {
-    mockStream.mockReturnValue(makeAbortChunks(''));
+    mockStream.mockReturnValue(makeAbortChunks());
 
     const res = await POST(makeRequest(makeRecipe()));
     const events = await collectEvents(res.body!);
@@ -436,5 +429,74 @@ describe('POST /api/generate — error path (non-abort error)', () => {
     expect(events.find((e) => e.event === 'done')).toBeUndefined();
     const errorEvent = events.find((e) => e.event === 'error');
     expect(errorEvent).toBeDefined();
+    // addPage must NOT be called when createSite fails.
+    expect(mockAddPage).not.toHaveBeenCalled();
+  });
+
+  it('error event includes artifactId when createSite throws AFTER a successful save', async () => {
+    // Fix 2: a post-save failure must carry the artifactId so the saved
+    // artifact can be recovered rather than remaining an unreachable zombie.
+    const savedId = 'artifact-zombie-test';
+    mockArchiveSave.mockResolvedValue(savedId);
+    mockStream.mockReturnValue(makeChunks('<h1>Saved then failed</h1>'));
+    mockCreateSite.mockRejectedValue(new Error('char_length constraint violated'));
+
+    const res = await POST(makeRequest(makeRecipe()));
+    const events = await collectEvents(res.body!);
+
+    const errorEvent = events.find((e) => e.event === 'error');
+    expect(errorEvent).toBeDefined();
+    const payload = errorEvent!.data as Record<string, unknown>;
+    expect(payload.artifactId).toBe(savedId);
+    expect(payload.error).toContain('char_length constraint violated');
+  });
+});
+
+describe('POST /api/generate — Fix 1: validate recipe before any billable call', () => {
+  it('returns 400 for invalid recipe (empty projectName) WITHOUT invoking the Anthropic stream', async () => {
+    const req = new NextRequest('http://localhost/api/generate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        recipe: {
+          brief: {
+            projectName: '',
+            industry: 'tech',
+            posture: 'startup',
+            description: 'A valid description here.',
+          },
+          aesthetic: {
+            id: 'a-1',
+            bucket: 'aesthetic',
+            name: 'A',
+            shortDefinition: 'x',
+            coreMood: 'y',
+            bestUseCase: 'z',
+            distinctiveSignals: ['s'],
+            notes: '',
+            notionId: 'n-1',
+            hasOverride: false,
+          },
+          layout: {
+            id: 'l-1',
+            bucket: 'layout',
+            name: 'L',
+            shortDefinition: 'x',
+            coreMood: 'y',
+            bestUseCase: 'z',
+            distinctiveSignals: ['s'],
+            notes: '',
+            notionId: 'n-2',
+            hasOverride: false,
+          },
+        },
+      }),
+    });
+
+    const res = await POST(req);
+
+    // Must reject before touching the Anthropic client.
+    expect(res.status).toBe(400);
+    expect(mockStream).not.toHaveBeenCalled();
   });
 });

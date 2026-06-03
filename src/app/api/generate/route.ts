@@ -5,7 +5,7 @@ import { defaultArchiveStore } from '@/lib/generation/archive';
 import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
-import type { Recipe } from '@/lib/types';
+import { RecipeSchema } from '@/lib/schemas';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -22,13 +22,16 @@ interface UsageTracking {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as { recipe: Recipe };
-  const recipe = body.recipe;
-  if (!recipe?.aesthetic?.id || !recipe.layout?.id) {
-    return new Response(JSON.stringify({ error: 'recipe missing required buckets' }), {
-      status: 400,
-    });
+  // Validate the recipe BEFORE spending any tokens — fail fast on bad input.
+  const body = await req.json().catch(() => null);
+  const parsed = RecipeSchema.safeParse(body?.recipe);
+  if (!parsed.success) {
+    return new Response(
+      JSON.stringify({ error: parsed.error.issues[0]?.message ?? 'invalid recipe' }),
+      { status: 400 },
+    );
   }
+  const recipe = parsed.data;
 
   const request = await assembleGenerationRequest(recipe);
   const client = getAnthropicClient();
@@ -41,6 +44,7 @@ export async function POST(req: NextRequest) {
       };
 
       let html = '';
+      let archiveId: string | undefined;
       const usage: UsageTracking = {
         inputTokens: 0,
         outputTokens: 0,
@@ -94,7 +98,7 @@ export async function POST(req: NextRequest) {
         });
 
         const archive = defaultArchiveStore();
-        const archiveId = await archive.save({
+        archiveId = await archive.save({
           recipeSummary: `${recipe.aesthetic.id} + ${recipe.layout.id}`,
           html,
           htmlSource,
@@ -135,7 +139,12 @@ export async function POST(req: NextRequest) {
         if (err instanceof Error && (err.name === 'AbortError' || req.signal.aborted)) {
           return;
         }
-        send('error', { error: errorMessage(err) });
+        // Include archiveId if archive.save succeeded before the failure —
+        // the saved artifact is otherwise an unreachable zombie with no recovery path.
+        send('error', {
+          error: errorMessage(err),
+          ...(archiveId ? { artifactId: archiveId } : {}),
+        });
       } finally {
         try {
           controller.close();
