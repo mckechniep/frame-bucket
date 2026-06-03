@@ -160,6 +160,7 @@ export async function POST(req: NextRequest) {
         const cost = estimateCost({
           model: anthropicRequest.model,
           inputTokens: usage.inputTokens,
+          cacheCreationTokens: usage.cacheCreationTokens,
           cacheReadTokens: usage.cacheReadTokens,
           outputTokens: usage.outputTokens,
         });

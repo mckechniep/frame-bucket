@@ -281,6 +281,7 @@ export async function POST(
         const cost = estimateCost({
           model: request.model,
           inputTokens: finalUsage.inputTokens,
+          cacheCreationTokens: finalUsage.cacheCreationTokens,
           cacheReadTokens: finalUsage.cacheReadTokens,
           outputTokens: finalUsage.outputTokens,
         });
