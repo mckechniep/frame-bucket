@@ -19,6 +19,7 @@ interface CreateResponse {
   url: string;
   name: string;
   createdAt: string;
+  pageCount: number;
 }
 
 interface ErrorBody {
@@ -47,6 +48,7 @@ function CreateShareModalInner({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [createdPageCount, setCreatedPageCount] = useState<number | null>(null);
   const [copyState, setCopyState] = useState<'idle' | 'copied'>('idle');
 
   // Latest onClose without including it in the open/close effect's deps —
@@ -112,6 +114,7 @@ function CreateShareModalInner({
         }
         const data = (await res.json()) as CreateResponse;
         setCreatedUrl(data.url);
+        setCreatedPageCount(data.pageCount);
         onSuccess?.();
       }
     } catch (err) {
@@ -157,7 +160,11 @@ function CreateShareModalInner({
               Share link created
             </h2>
             <p className="text-[var(--text-base)] leading-relaxed text-[var(--color-ink-muted)]">
-              Anyone with this link can view the artifact. Revoke it any time from /shares.
+              Anyone with this link can view this site.{' '}
+              {createdPageCount !== null
+                ? `Covers ${createdPageCount} ${createdPageCount === 1 ? 'page' : 'pages'} as they are right now.`
+                : null}{' '}
+              Revoke it any time from /shares.
             </p>
           </header>
 
@@ -206,7 +213,7 @@ function CreateShareModalInner({
             <p className="text-[var(--text-base)] leading-relaxed text-[var(--color-ink-muted)]">
               {isRename
                 ? 'Update the name shown in /shares. The URL does not change.'
-                : 'A private link that anyone you send it to can view. You can revoke it later.'}
+                : 'A private link that anyone you send it to can use to view this site. You can revoke it later.'}
             </p>
           </header>
 

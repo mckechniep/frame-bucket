@@ -498,6 +498,44 @@ function FinishActions({ artifactId, siteId, onShareCreated }: FinishActionsProp
           >
             Create share link
           </button>
+
+          {/* Design contract download — only rendered once a site exists.
+              Uses the established <details>/<summary> disclosure pattern
+              (server-renderable, no extra JS) consistent with share-footer.tsx.
+              Points at the operator route: GET /api/site/<siteId>/contract
+              Valid filenames are EXACTLY contract.md, tokens.json, tokens.css
+              (verified against VALID_FILES in the route). */}
+          {siteId ? (
+            <details className="group">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-[border-color,color,transform] duration-[var(--duration-fast)] hover:-translate-y-px hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]">
+                Design contract ↓
+              </summary>
+              <div className="mt-[var(--space-2)] flex flex-col items-end gap-[var(--space-1)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] px-[var(--space-3)] py-[var(--space-2)]">
+                <a
+                  href={`/api/site/${siteId}/contract?file=contract.md`}
+                  download="contract.md"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Contract (Markdown)
+                </a>
+                <a
+                  href={`/api/site/${siteId}/contract?file=tokens.json`}
+                  download="tokens.json"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Tokens (JSON)
+                </a>
+                <a
+                  href={`/api/site/${siteId}/contract?file=tokens.css`}
+                  download="tokens.css"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Tokens (CSS)
+                </a>
+              </div>
+            </details>
+          ) : null}
+
           {/* Secondary action — "Open standalone" only. The destructive
               "Start a new project" was removed from here because it
               duplicated the top-nav <WizardStartOver/> (which now wears
