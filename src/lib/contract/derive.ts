@@ -14,16 +14,28 @@ import type { StoredContract, DesignTokens } from './types';
  * both live wizard preview and share page rendering.
  *
  * Flow:
- *   1. Cache HIT  → return immediately (no LLM call, no archive read).
- *   2. Cache MISS → read archive → extract → narrative → assemble → put → return.
+ *   1. Cache HIT      → return immediately (no LLM call, no archive read).
+ *   2. In-flight HIT  → await the already-running derivation for this artifact.
+ *   3. Cache MISS     → read archive → extract → narrative → assemble → put → return.
  *
  * IMPORTANT: The cache-hit short-circuit is the most critical invariant here.
  * generateNarrative is a billable LLM call; calling it on every render would
  * be expensive and non-deterministic. Tests assert it is NEVER called on a hit.
  *
+ * In-flight dedup: collapses concurrent misses for the same artifact within one
+ * process to a single billable narrative call. Vercel default is one request per
+ * serverless instance, so this covers the wizard add-page + share-create
+ * concurrent surface where two callers hit the same cold artifact simultaneously.
+ * NOTE: this does NOT dedup across serverless instances — acceptable, the cost
+ * is one Haiku call per instance that cold-misses.
+ *
  * Throws:
  *   - `'ARTIFACT_NOT_FOUND: <id>'` when the archive has no record for the id.
  */
+
+// Per-process map of in-flight derivations keyed by artifactId.
+const inFlight = new Map<string, Promise<StoredContract>>();
+
 export async function deriveContract(
   artifactId: string,
   siteName: string,
@@ -32,6 +44,20 @@ export async function deriveContract(
   const cached = await defaultContractStore().get(artifactId);
   if (cached) return cached;
 
+  // ── 2. In-flight dedup ────────────────────────────────────────────────────
+  const existing = inFlight.get(artifactId);
+  if (existing) return existing;
+
+  const work = deriveContractInner(artifactId, siteName);
+  inFlight.set(artifactId, work);
+  try {
+    return await work;
+  } finally {
+    inFlight.delete(artifactId);
+  }
+}
+
+async function deriveContractInner(artifactId: string, siteName: string): Promise<StoredContract> {
   // ── 2. Load artifact ──────────────────────────────────────────────────────
   const record = await defaultArchiveStore().read(artifactId);
   if (!record) {

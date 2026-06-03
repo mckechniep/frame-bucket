@@ -93,8 +93,10 @@ function makeArchiveStoreMock(readImpl: (id: string) => Promise<ArchiveRecord | 
 describe('deriveContract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default generateNarrative mock — returns a valid narrative result
-    mockGenerateNarrative.mockResolvedValue({
+    // generateNarrative is a billable LLM call that tests override with ...Once()
+    // variants — use mockReset() so any unconsumed one-shot queues from a prior
+    // test can't leak into the next one, then re-establish a safe default.
+    mockGenerateNarrative.mockReset().mockResolvedValue({
       narrative: {
         identity: 'Cyberpunk aesthetic.',
         rules: 'Use dark backgrounds.',
@@ -282,6 +284,53 @@ describe('deriveContract', () => {
       expect(result.cost).toBe(0);
       // tokensCss is still rendered from tokens
       expect(result.tokensCss).toBeTruthy();
+    });
+  });
+
+  // ── Concurrent in-flight dedup ───────────────────────────────────────────
+
+  describe('concurrent in-flight dedup', () => {
+    it('calls generateNarrative exactly once when two concurrent calls race on the same artifactId', async () => {
+      const record = makeArchiveRecord();
+
+      // Narrative mock resolves on next tick so both callers are guaranteed
+      // in-flight simultaneously before either completes.
+      let resolveNarrative!: (v: unknown) => void;
+      const narrativePromise = new Promise((res) => {
+        resolveNarrative = res;
+      });
+      mockGenerateNarrative.mockReturnValue(narrativePromise);
+
+      const contractStore = makeContractStoreMock(
+        () => Promise.resolve(null), // always a cache miss
+      );
+      const archiveStore = makeArchiveStoreMock(() => Promise.resolve(record));
+
+      mockDefaultContractStore.mockReturnValue(contractStore);
+      mockDefaultArchiveStore.mockReturnValue(archiveStore);
+
+      // Launch both calls without awaiting the first — they are genuinely concurrent
+      const p1 = deriveContract('art-concurrent', 'My Site');
+      const p2 = deriveContract('art-concurrent', 'My Site');
+
+      // Unblock the narrative
+      resolveNarrative({
+        narrative: {
+          identity: 'Cyberpunk aesthetic.',
+          rules: 'Use dark backgrounds.',
+          componentPatterns: 'Neon borders on cards.',
+          howToExtend: 'Follow the token system.',
+        },
+        modelId: 'claude-haiku-4-5',
+        cost: 0.001,
+      });
+
+      const [result1, result2] = await Promise.all([p1, p2]);
+
+      // CRITICAL: only one billable call regardless of how many concurrent callers
+      expect(mockGenerateNarrative).toHaveBeenCalledTimes(1);
+      // Both callers get equal results
+      expect(result1).toEqual(result2);
     });
   });
 

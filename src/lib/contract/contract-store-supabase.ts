@@ -26,16 +26,31 @@ interface TokensJsonbPayload {
   tokensJson: string;
 }
 
+function isTokensPayload(v: unknown): v is TokensJsonbPayload {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    'designTokens' in v &&
+    'tokensJson' in v &&
+    typeof (v as TokensJsonbPayload).tokensJson === 'string'
+  );
+}
+
 function rowToStoredContract(row: ContractRow): StoredContract {
-  const payload = row.tokens as unknown as TokensJsonbPayload;
+  const raw: unknown = row.tokens;
+  if (!isTokensPayload(raw)) {
+    throw new Error(
+      `SupabaseContractStore: unexpected tokens jsonb shape for artifact ${row.artifact_id}`,
+    );
+  }
   return {
-    tokens: payload.designTokens,
-    tokensJson: payload.tokensJson,
+    tokens: raw.designTokens,
+    tokensJson: raw.tokensJson,
     contractMd: row.contract_md,
     tokensCss: row.tokens_css,
     modelId: row.model_id ?? '',
     cost: row.cost ?? 0,
-    createdAt: row.created_at,
+    createdAt: row.created_at ?? new Date().toISOString(),
   };
 }
 

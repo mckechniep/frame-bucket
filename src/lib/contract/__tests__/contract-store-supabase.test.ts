@@ -123,6 +123,29 @@ describe('SupabaseContractStore', () => {
       expect(result?.modelId).toBe('');
       expect(result?.cost).toBe(0);
     });
+
+    it('throws a clear error when tokens jsonb is a bare DesignTokens object (no envelope)', async () => {
+      // Simulates a legacy/malformed row where the tokens column holds a raw
+      // DesignTokens object instead of the expected { designTokens, tokensJson }
+      // envelope — previously this silently produced undefined fields downstream.
+      const bareTokens = makeTokens();
+      const row = {
+        artifact_id: 'art-malformed',
+        tokens: bareTokens, // missing the envelope — bare DesignTokens object
+        contract_md: '# Contract',
+        tokens_css: ':root {}',
+        model_id: 'claude-haiku-4-5',
+        cost: 0.001,
+        created_at: '2026-06-01T00:00:00.000Z',
+      };
+      const chain = makeChain({ data: row, error: null });
+      mockSupabase(() => chain);
+
+      const store = new SupabaseContractStore();
+      await expect(store.get('art-malformed')).rejects.toThrow(
+        'SupabaseContractStore: unexpected tokens jsonb shape for artifact art-malformed',
+      );
+    });
   });
 
   describe('put', () => {

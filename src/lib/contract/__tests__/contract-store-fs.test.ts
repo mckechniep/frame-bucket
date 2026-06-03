@@ -46,6 +46,18 @@ describe('FsContractStore', () => {
       const result = await store.get('artifact-no-contract');
       expect(result).toBeNull();
     });
+
+    it('throws with the file path in the message when contract.json is malformed JSON', async () => {
+      const baseDir = makeTmpDir();
+      const store = new FsContractStore(baseDir);
+      const artifactDir = path.join(baseDir, 'artifact-malformed');
+      fs.mkdirSync(artifactDir);
+      fs.writeFileSync(path.join(artifactDir, 'contract.json'), '{ not valid json }', 'utf-8');
+
+      await expect(store.get('artifact-malformed')).rejects.toThrow(
+        /FsContractStore: malformed contract\.json at .+artifact-malformed.+contract\.json/,
+      );
+    });
   });
 
   describe('put + get round-trip', () => {

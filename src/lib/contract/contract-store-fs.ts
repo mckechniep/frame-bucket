@@ -26,12 +26,19 @@ export class FsContractStore implements ContractStore {
 
   async get(artifactId: string): Promise<StoredContract | null> {
     const filePath = this.contractPath(artifactId);
+    let raw: string;
     try {
-      const raw = await fs.readFile(filePath, 'utf-8');
-      return JSON.parse(raw) as StoredContract;
+      raw = await fs.readFile(filePath, 'utf-8');
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
       throw err;
+    }
+    try {
+      return JSON.parse(raw) as StoredContract;
+    } catch (e) {
+      throw new Error(
+        `FsContractStore: malformed contract.json at ${filePath}: ${(e as Error).message}`,
+      );
     }
   }
 
