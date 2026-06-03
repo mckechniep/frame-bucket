@@ -6,6 +6,7 @@ import { defaultArchiveStore } from '@/lib/generation/archive';
 import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -190,8 +191,9 @@ export async function POST(req: NextRequest) {
         if (siteId && slug) {
           const updated = await defaultSiteStore().setPageArtifact(siteId, slug, archiveId);
           if (!updated) {
-            console.warn(
-              `[iterate] setPageArtifact found no page for site=${siteId} slug=${slug}; artifact saved but page pointer not advanced`,
+            logger.warn(
+              '[iterate] setPageArtifact found no page; artifact saved but page pointer not advanced',
+              { siteId, slug },
             );
           }
         }

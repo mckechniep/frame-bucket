@@ -18,6 +18,8 @@ export interface IterationRequest {
   previousHtml?: string;
   previousArtifactId: string;
   feedback: string;
+  siteId?: string;
+  slug?: string;
 }
 
 /**
