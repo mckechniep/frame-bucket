@@ -129,6 +129,42 @@ describe('MemoryShareStore', () => {
       expect(fetched?.pages[0]?.title).toBe('Home');
     });
 
+    it('sorts pages by position ascending even when input is out of order', async () => {
+      const store = new MemoryShareStore();
+      const pages: SharePageSnapshot[] = [
+        makePage({ slug: '/about', title: 'About', position: 1 }),
+        makePage({ slug: '/', title: 'Home', position: 0 }),
+      ];
+      await store.create({ siteId: 'site-abc', name: 'Ordering Test', pages });
+      // Find by token from any created record
+      const all = await store.list();
+      expect(all[0]!.pages[0]!.position).toBe(0);
+      expect(all[0]!.pages[0]!.slug).toBe('/');
+      expect(all[0]!.pages[1]!.position).toBe(1);
+      expect(all[0]!.pages[1]!.slug).toBe('/about');
+    });
+
+    it('findByToken returns pages sorted by position ascending when created out of order', async () => {
+      const store = new MemoryShareStore();
+      const pages: SharePageSnapshot[] = [
+        makePage({ slug: '/about', title: 'About', position: 1 }),
+        makePage({ slug: '/', title: 'Home', position: 0 }),
+      ];
+      const created = await store.create({ siteId: 'site-abc', name: 'Ordering Test', pages });
+      const found = await store.findByToken(created.token);
+      expect(found?.pages[0]!.position).toBe(0);
+      expect(found?.pages[0]!.slug).toBe('/');
+      expect(found?.pages[1]!.position).toBe(1);
+      expect(found?.pages[1]!.slug).toBe('/about');
+    });
+
+    it('throws when site-scoped create is called with empty pages', async () => {
+      const store = new MemoryShareStore();
+      await expect(
+        store.create({ siteId: 'site-abc', name: 'No Pages', pages: [] }),
+      ).rejects.toThrow(/pages must not be empty/);
+    });
+
     it('legacy create (transitional) — { artifactId, name } still works; siteId is empty string, pages empty', async () => {
       const store = new MemoryShareStore();
       const r = await store.create({ artifactId: 'art-legacy', name: 'legacy share' });

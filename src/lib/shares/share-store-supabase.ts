@@ -26,6 +26,13 @@ export class SupabaseShareStore implements ShareStore {
     const token = generateShareToken();
 
     if ('siteId' in input) {
+      // Fail fast: site-scoped shares must have at least one page.
+      if (input.pages.length === 0) {
+        throw new Error(
+          'SupabaseShareStore.create: pages must not be empty for site-scoped shares',
+        );
+      }
+
       // New site-scoped path: insert shares row + share_pages rows.
       const { error: shareErr } = await sb
         .from('shares')
@@ -33,19 +40,24 @@ export class SupabaseShareStore implements ShareStore {
       if (shareErr) throw new Error(`SupabaseShareStore.create (shares): ${shareErr.message}`);
 
       // Batch-insert all page snapshots.
-      const pageRows = input.pages.map((p, i) => ({
+      const pageRows = input.pages.map((p) => ({
         token,
         slug: p.slug,
         title: p.title,
         artifact_id: p.artifactId,
-        position: p.position ?? i,
+        position: p.position,
       }));
 
       const { error: pagesErr } = await sb.from('share_pages').insert(pageRows);
       if (pagesErr) {
         // Manual rollback: delete the shares row we just inserted so we don't
         // leave an orphan share with no pages. Supabase JS has no transactions.
-        await sb.from('shares').delete().eq('token', token);
+        const { error: rollbackErr } = await sb.from('shares').delete().eq('token', token);
+        if (rollbackErr) {
+          console.error(
+            `[SupabaseShareStore.create] rollback failed for token ${token}: ${rollbackErr.message}`,
+          );
+        }
         throw new Error(`SupabaseShareStore.create (share_pages): ${pagesErr.message}`);
       }
 
@@ -181,16 +193,8 @@ export class SupabaseShareStore implements ShareStore {
     if (error) throw new Error(`SupabaseShareStore.revoke: ${error.message}`);
     if (!data) return null;
 
-    // Fetch pages so the returned record is fully populated.
-    const { data: pageData, error: pageErr } = await sb
-      .from('share_pages')
-      .select('*')
-      .eq('token', token)
-      .order('position', { ascending: true });
-    if (pageErr) throw new Error(`SupabaseShareStore.revoke (pages): ${pageErr.message}`);
-
-    const pages = pageRowsToSnapshots((pageData ?? []) as SharePageRow[]);
-    return rowToRecord(data as ShareRow, pages);
+    // Reuse pages already fetched by findByToken — pages don't change during revoke.
+    return rowToRecord(data as ShareRow, existing.pages);
   }
 
   /**

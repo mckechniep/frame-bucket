@@ -26,6 +26,9 @@ export class MemoryShareStore implements ShareStore {
     if ('siteId' in input) {
       // New site-scoped path: deep-copy the caller's pages array so mutations
       // to the original after create cannot change the stored snapshot.
+      if (input.pages.length === 0) {
+        throw new Error('MemoryShareStore.create: pages must not be empty for site-scoped shares');
+      }
       siteId = input.siteId;
       pages = clonePages(input.pages);
       artifactId = '';
@@ -95,7 +98,11 @@ export class MemoryShareStore implements ShareStore {
 function rowToRecord(row: MemoryRow): ShareRecord {
   // Strip the internal viewBuckets Set before returning.
   // Deep-copy pages so callers cannot mutate internal snapshot state.
+  // Sort by position ascending to match SupabaseShareStore's ORDER BY position ASC.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { viewBuckets, pages, ...rest } = row;
-  return { ...rest, pages: clonePages(pages) };
+  return {
+    ...rest,
+    pages: clonePages(pages).sort((a, b) => a.position - b.position),
+  };
 }

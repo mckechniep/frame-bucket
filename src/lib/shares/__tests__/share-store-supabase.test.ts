@@ -90,6 +90,7 @@ function mockTwoTable(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  supabaseServerMock.mockReset();
 });
 
 // ===========================================================================
@@ -173,9 +174,8 @@ describe('SupabaseShareStore', () => {
           capturedToken.value = row.token as string;
           return Promise.resolve({ error: null });
         });
-        const deleteFn = vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ error: null }),
-        });
+        const eqFn = vi.fn().mockResolvedValue({ error: null });
+        const deleteFn = vi.fn().mockReturnValue({ eq: eqFn });
         const sharesChain: Record<string, unknown> = {
           insert: sharesInsert,
           select: vi.fn(() => ({ eq: vi.fn(() => ({ single: vi.fn() })) })),
@@ -193,12 +193,22 @@ describe('SupabaseShareStore', () => {
           /fk violation/,
         );
 
-        // DELETE was called on shares to roll back
+        // DELETE was called on shares to roll back, with the correct token
         expect(deleteFn).toHaveBeenCalledTimes(1);
-        const deleteResult = (deleteFn as ReturnType<typeof vi.fn>).mock.results[0];
-        expect(deleteResult).toBeDefined();
-        const eqFn = deleteResult?.value as Record<string, unknown>;
-        expect(eqFn?.eq).toBeDefined();
+        expect(eqFn).toHaveBeenCalledWith('token', capturedToken.value);
+      });
+
+      it('throws before inserting anything when pages array is empty', async () => {
+        const insertFn = vi.fn();
+        mockSupabase(() => ({ insert: insertFn }));
+
+        const store = new SupabaseShareStore();
+        await expect(
+          store.create({ siteId: 'site-123', name: 'No Pages', pages: [] }),
+        ).rejects.toThrow(/pages must not be empty/);
+
+        // Nothing should have been inserted
+        expect(insertFn).not.toHaveBeenCalled();
       });
 
       it('does not insert share_pages for the legacy path', async () => {
