@@ -71,7 +71,21 @@ function makePageRow(overrides?: Partial<Record<string, unknown>>) {
 
 describe('SupabaseSiteStore', () => {
   describe('createSite', () => {
-    it('inserts a row and returns a mapped SiteRecord', async () => {
+    it('generates a valid site-<hex12> id and maps the returned row', async () => {
+      const row = makeSiteRow();
+      const chain = makeChain({ data: row, error: null });
+      mockSupabase(() => chain);
+
+      const store = new SupabaseSiteStore();
+      await store.createSite({ name: 'Test Site' });
+
+      // Verify the store generated a valid ID and passed it to insert()
+      const insertFn = chain.insert as ReturnType<typeof vi.fn>;
+      const insertedPayload = insertFn.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(insertedPayload.id).toMatch(/^site-[0-9a-f]{12}$/);
+    });
+
+    it('maps the returned row fields correctly', async () => {
       const row = makeSiteRow();
       const chain = makeChain({ data: row, error: null });
       mockSupabase(() => chain);
@@ -79,7 +93,8 @@ describe('SupabaseSiteStore', () => {
       const store = new SupabaseSiteStore();
       const record = await store.createSite({ name: 'Test Site' });
 
-      expect(record.id).toMatch(/^site-[0-9a-f]{12}$/);
+      // These verify row-mapping, not ID generation
+      expect(record.id).toBe('site-aabbcc112233');
       expect(record.name).toBe('Test Site');
       expect(record.createdAt).toBe('2026-01-01T00:00:00.000Z');
       expect(record.updatedAt).toBe('2026-01-01T00:00:00.000Z');
@@ -156,22 +171,22 @@ describe('SupabaseSiteStore', () => {
       expect(page.createdAt).toBe('2026-01-01T00:00:00.000Z');
     });
 
-    it('throws SLUG_EXISTS on 23505 unique violation', async () => {
+    it('throws SLUG_EXISTS on 23505 unique violation with exact message format', async () => {
       const chain = makeChain({ error: { code: '23505', message: 'duplicate key value' } });
       mockSupabase(() => chain);
 
       const store = new SupabaseSiteStore();
       await expect(
         store.addPage('site-aabbcc112233', {
-          slug: '/home',
-          title: 'Home',
+          slug: '/about',
+          title: 'About',
           artifactId: 'art-abc',
           position: 0,
         }),
-      ).rejects.toThrow(/SLUG_EXISTS/);
+      ).rejects.toThrow('SLUG_EXISTS: slug "/about" already exists in site site-aabbcc112233');
     });
 
-    it('throws SITE_NOT_FOUND on 23503 FK violation', async () => {
+    it('throws SITE_NOT_FOUND on 23503 FK violation with exact message format', async () => {
       const chain = makeChain({
         error: { code: '23503', message: 'violates foreign key constraint' },
       });
@@ -185,7 +200,7 @@ describe('SupabaseSiteStore', () => {
           artifactId: 'art-abc',
           position: 0,
         }),
-      ).rejects.toThrow(/SITE_NOT_FOUND/);
+      ).rejects.toThrow('SITE_NOT_FOUND: no site with id site-unknown');
     });
 
     it('propagates other Supabase errors', async () => {
@@ -287,13 +302,7 @@ describe('SupabaseSiteStore', () => {
 
   describe('removePage', () => {
     it('returns true when the page was deleted', async () => {
-      // Supabase delete with .select returns the deleted rows
-      const chain: Record<string, unknown> = {};
-      const makeFluent = () => vi.fn(() => chain);
-      chain.eq = makeFluent();
-      chain.select = vi.fn().mockResolvedValue({ data: [makePageRow()], error: null });
-      chain.delete = makeFluent();
-
+      // Supabase delete returns the deleted rows via .delete().eq().eq().select()
       const deleteChain: Record<string, unknown> = {};
       deleteChain.eq = vi.fn(() => deleteChain);
       deleteChain.select = vi.fn().mockResolvedValue({ data: [makePageRow()], error: null });

@@ -60,10 +60,10 @@ export class SupabaseSiteStore implements SiteStore {
       .single();
     if (error) {
       if (error.code === '23505') {
-        throw new Error(`SupabaseSiteStore.addPage: SLUG_EXISTS (${input.slug})`);
+        throw new Error(`SLUG_EXISTS: slug "${input.slug}" already exists in site ${siteId}`);
       }
       if (error.code === '23503') {
-        throw new Error(`SupabaseSiteStore.addPage: SITE_NOT_FOUND (${siteId})`);
+        throw new Error(`SITE_NOT_FOUND: no site with id ${siteId}`);
       }
       throw new Error(`SupabaseSiteStore.addPage: ${error.message}`);
     }
