@@ -244,6 +244,26 @@ describe('injectNav — idempotency', () => {
     const twice = injectNav(once, PAGES, '/about');
     expect(twice).toBe(once);
   });
+
+  it('idempotent with aria-current + targetTop (Task 20 combination)', () => {
+    // /about is NOT the first page by position — exercises the managed-attr
+    // ordering bug path where run 1 could emit aria-current before target
+    // and run 2 could reverse them.
+    const once = injectNav(STYLED_TEMPLATE_HTML, PAGES, '/about', { targetTop: true });
+    const twice = injectNav(once, PAGES, '/about', { targetTop: true });
+    expect(twice).toBe(once);
+  });
+
+  it('hrefFor + targetTop compose correctly and stay idempotent', () => {
+    const hrefFor = (s: string) => `/share/TOKEN${s}`;
+    const opts = { hrefFor, targetTop: true };
+    const once = injectNav(STYLED_TEMPLATE_HTML, PAGES, '/about', opts);
+    // Both opts applied: mapped href and target="_top"
+    expect(once).toContain('href="/share/TOKEN/about"');
+    expect(once).toContain('target="_top"');
+    const twice = injectNav(once, PAGES, '/about', opts);
+    expect(twice).toBe(once);
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -268,6 +288,47 @@ describe('injectNav — HTML-escaped titles', () => {
     const pages: NavPage[] = [{ slug: '/', title: 'Say "Hello"', position: 1 }];
     const result = injectNav(STYLED_TEMPLATE_HTML, pages, '/');
     expect(result).toContain('>Say &quot;Hello&quot;<');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// injectNav — href escaping
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('injectNav — href escaping', () => {
+  it('escapes double-quote in slug to prevent attribute breakout', () => {
+    const maliciousPages: NavPage[] = [
+      { slug: '/x" onmouseover="evil', title: 'Evil', position: 1 },
+    ];
+    const result = injectNav(STYLED_TEMPLATE_HTML, maliciousPages, '/');
+    // The raw breakout sequence must NOT appear
+    expect(result).not.toContain('" onmouseover=');
+    // The escaped form must be present
+    expect(result).toContain('&quot;');
+  });
+
+  it('escapes double-quote returned by hrefFor to prevent attribute breakout', () => {
+    const pages: NavPage[] = [{ slug: '/', title: 'Home', position: 1 }];
+    const hrefFor = () => '/path?x=1"&y=2';
+    const result = injectNav(STYLED_TEMPLATE_HTML, pages, '/', { hrefFor });
+    expect(result).not.toContain('href="/path?x=1"');
+    expect(result).toContain('&quot;');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// injectNav — removeAttr handles unquoted attribute forms
+// ──────────────────────────────────────────────────────────────────────────────
+
+describe('injectNav — removeAttr unquoted / boolean forms', () => {
+  it('strips unquoted aria-current from a non-current page anchor', () => {
+    // Template carries aria-current=page (no quotes) on the Home anchor.
+    // Injecting with currentSlug='/about' should leave Home with NO aria-current.
+    const html = makeHtml(`<a href="/" aria-current=page>Home</a>`);
+    const result = injectNav(html, PAGES, '/about');
+    const homeRe = /<a\b[^>]*href="\/"[^>]*>/;
+    const homeTag = homeRe.exec(result)?.[0] ?? '';
+    expect(homeTag).not.toContain('aria-current');
   });
 });
 

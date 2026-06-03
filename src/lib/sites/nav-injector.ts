@@ -99,8 +99,8 @@ function escapeHtml(text: string): string {
 interface AnchorParts {
   /** The full opening tag, e.g. `<a class="nav-link" href="/">` */
   openTag: string;
-  /** The inner content between the opening and closing tag. */
-  innerText: string;
+  // Note: template inner HTML is intentionally discarded — titles are always
+  // replaced with escaped page.title values from the manifest.
 }
 
 /**
@@ -140,13 +140,11 @@ function extractFirstAnchor(content: string): AnchorParts | null {
   const openTagEnd = i + 1; // index after the >
   const openTag = content.slice(aStart, openTagEnd);
 
-  // Find </a> after the opening tag (case-insensitive)
+  // Confirm a closing </a> exists — malformed anchors without a close tag are rejected.
   const closeTagRe = /<\/a>/i;
-  const closeMatch = closeTagRe.exec(content.slice(openTagEnd));
-  if (!closeMatch) return null;
+  if (!closeTagRe.test(content.slice(openTagEnd))) return null;
 
-  const innerText = content.slice(openTagEnd, openTagEnd + closeMatch.index);
-  return { openTag, innerText };
+  return { openTag };
 }
 
 /**
@@ -170,6 +168,10 @@ function detectSeparator(content: string): string {
 /**
  * Clones the template open tag and produces a fully-formed anchor string
  * for the given page.
+ *
+ * Managed attributes (`aria-current`, `target`) are unconditionally stripped
+ * then re-added in a FIXED canonical order so output is identical regardless
+ * of what the extracted template already carries (idempotency guarantee).
  */
 function buildAnchor(
   openTag: string,
@@ -180,16 +182,11 @@ function buildAnchor(
 ): string {
   let tag = setHrefAttr(openTag, href);
 
-  if (isCurrent) {
-    tag = ensureAttr(tag, 'aria-current', 'page');
-  } else {
-    // Remove any leftover aria-current from the template on non-current pages
-    tag = removeAttr(tag, 'aria-current');
-  }
-
-  if (targetTop) {
-    tag = ensureAttr(tag, 'target', '_top');
-  }
+  // Strip both managed attrs, then re-add in canonical order (idempotent)
+  tag = removeAttr(tag, 'aria-current');
+  tag = removeAttr(tag, 'target');
+  if (isCurrent) tag = addAttr(tag, 'aria-current', 'page');
+  if (targetTop) tag = addAttr(tag, 'target', '_top');
 
   return `${tag}${escapedTitle}</a>`;
 }
@@ -197,33 +194,39 @@ function buildAnchor(
 /**
  * Replaces the value of the `href` attribute in an opening tag.
  * If no href attribute exists, inserts one before the closing `>`.
+ *
+ * The href value is escaped (`"` → `&quot;`) to prevent attribute breakout
+ * when slugs or hrefFor results contain double-quote characters.
  */
 function setHrefAttr(openTag: string, href: string): string {
+  const safeHref = href.replace(/"/g, '&quot;');
   // Match href="..." or href='...' (possibly with spaces around =)
   const hrefRe = /\bhref\s*=\s*(?:"[^"]*"|'[^']*')/i;
   if (hrefRe.test(openTag)) {
-    return openTag.replace(hrefRe, `href="${href}"`);
+    return openTag.replace(hrefRe, `href="${safeHref}"`);
   }
   // No href — insert before the closing >
-  return openTag.replace(/>$/, ` href="${href}">`);
+  return openTag.replace(/>$/, ` href="${safeHref}">`);
 }
 
 /**
- * Ensures an attribute with the given name and value is present in the tag,
- * adding it before `>` if absent, or leaving it untouched if already present
- * with any value. Normalizes to the given value only when absent.
- */
-function ensureAttr(openTag: string, name: string, value: string): string {
-  const attrRe = new RegExp(`\\b${name}\\s*=`, 'i');
-  if (attrRe.test(openTag)) return openTag; // already present — don't touch
-  return openTag.replace(/>$/, ` ${name}="${value}">`);
-}
-
-/**
- * Removes an attribute (name="value" or name='value') from an opening tag.
- * Used to strip `aria-current` from the template when building non-current links.
+ * Removes an attribute from an opening tag.
+ * Handles quoted (double/single), unquoted, and boolean (name-only) attribute forms.
+ * The lookbehind `(?<![\\w-])` prevents matching a suffix of a longer attribute
+ * name (e.g. `xaria-current`). Node 20+ supports lookbehind assertions.
  */
 function removeAttr(openTag: string, name: string): string {
-  const attrRe = new RegExp(`\\s*\\b${name}\\s*=\\s*(?:"[^"]*"|'[^']*')`, 'gi');
+  const attrRe = new RegExp(
+    `\\s*(?<![\\w-])${name}(?:\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s>]*))?`,
+    'gi',
+  );
   return openTag.replace(attrRe, '');
+}
+
+/**
+ * Unconditionally inserts `name="value"` before the closing `>` of an opening tag.
+ * Always appends so that attribute order is deterministic regardless of template state.
+ */
+function addAttr(openTag: string, name: string, value: string): string {
+  return openTag.replace(/>\s*$/, ` ${name}="${value}">`);
 }
