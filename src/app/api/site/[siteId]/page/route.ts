@@ -209,31 +209,34 @@ export async function POST(
         // ── First stream attempt ───────────────────────────────────────────
         const { html: firstHtml, usage: firstUsage } = await runStream(client, request, req.signal);
 
-        // Emit deltas inline — we've already buffered, so send as one delta.
-        // (For a streaming UX, we could yield chunks; this mirrors generate's
-        // behaviour where we send the whole chunk as a single delta event.)
-        send('delta', { text: firstHtml });
-
         let finalHtml = firstHtml;
         let finalUsage = firstUsage;
 
         // ── Marker validation + one retry ─────────────────────────────────
         if (!hasNavMarkers(firstHtml)) {
           // Reinforce the directive in the user message and retry ONCE.
+          // Guard: assembleSubpageRequest returns string content today, but the
+          // SDK type allows ContentBlockParam[]. If it's not a string, skip the
+          // reinforcement and retry with the original request — stringifying a
+          // structured content array would corrupt the prompt.
           const firstContent = request.messages[0]?.content ?? '';
-          const reinforcedContent =
-            firstContent +
-            '\n\nIMPORTANT: your previous attempt omitted the required ' +
-            '<!-- fb:nav-links:start --> / <!-- fb:nav-links:end --> markers. ' +
-            'You MUST include them around the nav anchors.';
-
-          const reinforcedRequest = {
-            ...request,
-            messages: [
-              { role: 'user' as const, content: reinforcedContent },
-              ...request.messages.slice(1),
-            ],
-          };
+          const reinforcedRequest =
+            typeof firstContent === 'string'
+              ? {
+                  ...request,
+                  messages: [
+                    {
+                      role: 'user' as const,
+                      content:
+                        firstContent +
+                        '\n\nIMPORTANT: your previous attempt omitted the required ' +
+                        '<!-- fb:nav-links:start --> / <!-- fb:nav-links:end --> markers. ' +
+                        'You MUST include them around the nav anchors.',
+                    },
+                    ...request.messages.slice(1),
+                  ],
+                }
+              : request;
 
           const { html: retryHtml, usage: retryUsage } = await runStream(
             client,
@@ -241,10 +244,8 @@ export async function POST(
             req.signal,
           );
 
-          send('delta', { text: retryHtml });
-
           if (!hasNavMarkers(retryHtml)) {
-            // Both attempts failed — do NOT save, do NOT addPage.
+            // Both attempts failed — do NOT save, do NOT addPage, no delta.
             send('error', {
               code: 'MARKERS_MISSING',
               error:
@@ -271,6 +272,11 @@ export async function POST(
           finalHtml = await injectImages(finalHtml);
           send('images_done', { count: placeholderCount });
         }
+
+        // ── Single delta — emitted once, AFTER validation and image injection,
+        //    so the client preview matches what will be saved. No delta is
+        //    emitted on the MARKERS_MISSING path (early return above).
+        send('delta', { text: finalHtml });
 
         const cost = estimateCost({
           model: request.model,
@@ -359,12 +365,18 @@ export async function DELETE(
   }
   const { slug } = parsed.data;
 
-  // Home page cannot be deleted via this endpoint.
+  // Home page cannot be deleted via this endpoint (checked before isValidSlug
+  // because "/" passes isValidSlug but must always be blocked here).
   if (slug === '/') {
     return jsonResponse(
       { error: 'the home page cannot be deleted', code: 'CANNOT_DELETE_HOME' },
       400,
     );
+  }
+
+  // Reject garbage slugs before they reach the store.
+  if (!isValidSlug(slug)) {
+    return jsonResponse({ error: 'invalid slug' }, 400);
   }
 
   const siteStore = defaultSiteStore();

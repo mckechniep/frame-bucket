@@ -430,6 +430,20 @@ describe('POST /api/site/[siteId]/page — happy path', () => {
     expect(typeof payload.html).toBe('string');
   });
 
+  it('emits exactly ONE delta event containing the final saved html', async () => {
+    mockStream.mockReturnValue(makeChunks(HTML_WITH_MARKERS));
+
+    const req = makePostRequest({ slug: '/about', title: 'About', brief: 'A page about us.' });
+    const res = await POST(req, { params: FAKE_PARAMS });
+    const events = await collectEvents(res.body!);
+
+    const deltaEvents = events.filter((e) => e.event === 'delta');
+    expect(deltaEvents).toHaveLength(1);
+    // The single delta should contain the final (saved) html
+    const deltaPayload = deltaEvents[0]!.data as Record<string, unknown>;
+    expect(deltaPayload.text).toBe(HTML_WITH_MARKERS);
+  });
+
   it('calls archive.save with the generated HTML', async () => {
     mockStream.mockReturnValue(makeChunks(HTML_WITH_MARKERS));
 
@@ -501,6 +515,8 @@ describe('POST /api/site/[siteId]/page — happy path', () => {
 describe('POST /api/site/[siteId]/page — marker retry (Rule 9)', () => {
   it('retries once when first stream output lacks nav markers, succeeds on second', async () => {
     // First attempt: no markers. Second: markers present.
+    // makeChunks yields: input_tokens=100, cache_read=20, cache_creation=0, output_tokens=200
+    // So two attempts should sum to: inputTokens=200, cacheReadTokens=40, outputTokens=400
     mockStream
       .mockReturnValueOnce(makeChunks(HTML_WITHOUT_MARKERS))
       .mockReturnValueOnce(makeChunks(HTML_WITH_MARKERS));
@@ -523,6 +539,18 @@ describe('POST /api/site/[siteId]/page — marker retry (Rule 9)', () => {
     expect(doneEvent).toBeDefined();
     const payload = doneEvent!.data as Record<string, unknown>;
     expect(payload.artifactId).toBe(savedId);
+
+    // Usage must be the SUM of both attempts' tokens (guards accumulation block)
+    const usage = payload.usage as Record<string, number>;
+    expect(usage.inputTokens).toBe(200); // 100 + 100
+    expect(usage.outputTokens).toBe(400); // 200 + 200
+    expect(usage.cacheReadTokens).toBe(40); // 20 + 20
+
+    // Exactly ONE delta event, containing the retry (final saved) html — not the first attempt's
+    const deltaEvents = events.filter((e) => e.event === 'delta');
+    expect(deltaEvents).toHaveLength(1);
+    const deltaPayload = deltaEvents[0]!.data as Record<string, unknown>;
+    expect(deltaPayload.text).toBe(HTML_WITH_MARKERS);
   });
 
   it('emits MARKERS_MISSING error when both attempts lack markers', async () => {
@@ -546,6 +574,9 @@ describe('POST /api/site/[siteId]/page — marker retry (Rule 9)', () => {
     expect(errorEvent).toBeDefined();
     const payload = errorEvent!.data as Record<string, unknown>;
     expect(payload.code).toBe('MARKERS_MISSING');
+
+    // No delta emitted when no valid html was produced
+    expect(events.filter((e) => e.event === 'delta')).toHaveLength(0);
   });
 
   it('does NOT emit a done event when double marker failure occurs', async () => {
@@ -685,5 +716,15 @@ describe('DELETE /api/site/[siteId]/page', () => {
     // mockArchiveSave and mockArchiveRead should not be called
     expect(mockArchiveSave).not.toHaveBeenCalled();
     expect(mockArchiveRead).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an invalid slug and does NOT call removePage', async () => {
+    // Slugs without a leading slash are invalid per isValidSlug
+    const req = makeDeleteRequest({ slug: 'no-leading-slash' });
+    const res = await DELETE(req, { params: FAKE_PARAMS });
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as Record<string, unknown>;
+    expect(String(json.error)).toMatch(/slug/i);
+    expect(mockRemovePage).not.toHaveBeenCalled();
   });
 });
