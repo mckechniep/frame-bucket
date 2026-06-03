@@ -34,6 +34,13 @@ export async function loadInvariantLayers(): Promise<InvariantLayers> {
  * are fetched in parallel; the aesthetic override is fetched only when
  * `recipe.aesthetic.hasOverride` is true.
  */
+/** The exact text of the cached invariant system block. ALL assemblers (generation,
+ *  iteration, subpage) must emit this byte-for-byte so the Anthropic prompt cache is
+ *  shared across calls (Rule 8). Centralized here so the three call sites can't drift. */
+export function formatInvariantBlock(layers: InvariantLayers): string {
+  return `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`;
+}
+
 export async function loadCanonLayers(recipe: Recipe): Promise<CanonLayers> {
   const [invariant, override] = await Promise.all([
     loadInvariantLayers(),

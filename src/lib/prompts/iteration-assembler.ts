@@ -1,7 +1,7 @@
 import type { IterationRequest } from '@/lib/types';
 import type { Recipe } from '@/lib/types/recipe';
 import type { AnthropicRequest, SystemBlock } from './assembler';
-import { loadCanonLayers } from './canon-layers';
+import { loadCanonLayers, formatInvariantBlock } from './canon-layers';
 import { formatBrief } from './format-brief';
 
 const ITERATION_DIRECTIVE =
@@ -37,7 +37,7 @@ export async function assembleIterationRequest(
     },
     {
       type: 'text',
-      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
+      text: formatInvariantBlock(layers),
       cache_control: { type: 'ephemeral' },
     },
   ];

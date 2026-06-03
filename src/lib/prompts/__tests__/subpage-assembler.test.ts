@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { assembleSubpageRequest, outlineHtml } from '../subpage-assembler';
+import { formatInvariantBlock } from '../canon-layers';
 import type { NavPage } from '@/lib/sites/nav-injector';
 
 vi.mock('../loader', () => ({
@@ -9,10 +10,12 @@ vi.mock('../loader', () => ({
   loadAestheticOverride: vi.fn().mockResolvedValue(null),
 }));
 
-// The expected invariant block text — byte-identical to assembler.ts's block[1].
-// Rule 8: this exact string must be shared across generation + subpage calls.
-const EXPECTED_INVARIANT_BLOCK_TEXT =
-  '## Frontend Design Posture\n\nPOSTURE CONTENT\n\n## Craft Canon\n\nBASE CANON CONTENT\n\n## Generation Output Contract\n\nOUTPUT CONTRACT CONTENT';
+// The mock layers used by this test file's ../loader mock — drives formatInvariantBlock.
+const mockLayers = {
+  posture: 'POSTURE CONTENT',
+  baseCanon: 'BASE CANON CONTENT',
+  outputContract: 'OUTPUT CONTRACT CONTENT',
+};
 
 const baseNav: NavPage[] = [
   { slug: '/', title: 'Home', position: 0 },
@@ -41,9 +44,9 @@ describe('assembleSubpageRequest — system blocks', () => {
     expect(req.system[0]?.cache_control).toBeUndefined();
   });
 
-  it('block[1] text is byte-identical to assembler.ts invariant block format (Rule 8)', async () => {
+  it('block[1] text is byte-identical to formatInvariantBlock output (Rule 8)', async () => {
     const req = await assembleSubpageRequest(baseReq);
-    expect(req.system[1]?.text).toBe(EXPECTED_INVARIANT_BLOCK_TEXT);
+    expect(req.system[1]?.text).toBe(formatInvariantBlock(mockLayers));
   });
 
   it('block[1] has cache_control ephemeral', async () => {
@@ -165,6 +168,9 @@ describe('assembleSubpageRequest — model / stream', () => {
   });
 });
 
+// Cross-assembler Rule 8 byte-identity tests live in invariant-block.test.ts
+// to avoid mock-hoisting conflicts with this file's ../loader mock.
+
 describe('outlineHtml', () => {
   it('extracts h1, h2, h3 text in document order', () => {
     const html = `
@@ -204,6 +210,13 @@ describe('outlineHtml', () => {
     expect(result).toContain('(0 sections)');
   });
 
+  it('uses singular "section" for exactly one section', () => {
+    const html = '<h1>Title</h1><section></section>';
+    const result = outlineHtml(html);
+    expect(result).toContain('(1 section)');
+    expect(result).not.toContain('(1 sections)');
+  });
+
   it('returns (no headings found) with section count for empty input', () => {
     const result = outlineHtml('');
     expect(result).toContain('(no headings found)');
@@ -214,7 +227,7 @@ describe('outlineHtml', () => {
     const html = '<p>Just a paragraph</p><section></section>';
     const result = outlineHtml(html);
     expect(result).toContain('(no headings found)');
-    expect(result).toContain('(1 sections)');
+    expect(result).toContain('(1 section)');
   });
 
   it('caps output at 500 chars with ellipsis', () => {
@@ -225,6 +238,23 @@ describe('outlineHtml', () => {
     const result = outlineHtml(many);
     expect(result.length).toBeLessThanOrEqual(500);
     expect(result.endsWith('…')).toBe(true);
+  });
+
+  it('surrogate-safe truncation: does not produce lone surrogates when emoji falls on the cut boundary', () => {
+    // Build a heading whose text places a 2-code-unit emoji (🎨 = U+1F3A8)
+    // right across the 499/500 boundary so a naive .slice(0, 499) would
+    // cut between the high and low surrogate.
+    // Pad to position the emoji at chars 498–499 (0-indexed).
+    const pad = 'A'.repeat(490);
+    const html = `<h1>${pad}X🎨Y and more text here to push past 500 chars total</h1>`;
+    const result = outlineHtml(html);
+    // Must not exceed 500 chars
+    expect(result.length).toBeLessThanOrEqual(500);
+    // encodeURIComponent throws if there are lone surrogates — this is the
+    // pragmatic wire-safety check (ill-formed JSON would fail the same way)
+    expect(() => encodeURIComponent(result)).not.toThrow();
+    // No replacement character (U+FFFD), which some environments insert for bad surrogates
+    expect(result).not.toContain('�');
   });
 
   it('never throws on malformed HTML', () => {

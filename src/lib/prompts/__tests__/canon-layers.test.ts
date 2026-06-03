@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { loadInvariantLayers, loadCanonLayers } from '../canon-layers';
 import type { Posture } from '@/lib/types/recipe';
 
@@ -24,6 +24,10 @@ describe('loadInvariantLayers', () => {
 });
 
 describe('loadCanonLayers (regression — existing shape unchanged)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('returns all four fields including override when hasOverride is true', async () => {
     const recipe = {
       brief: {
@@ -67,7 +71,6 @@ describe('loadCanonLayers (regression — existing shape unchanged)', () => {
 
   it('returns null override when hasOverride is false', async () => {
     const { loadAestheticOverride } = await import('../loader');
-    vi.mocked(loadAestheticOverride).mockResolvedValueOnce(null);
 
     const recipe = {
       brief: {
@@ -104,5 +107,6 @@ describe('loadCanonLayers (regression — existing shape unchanged)', () => {
 
     const layers = await loadCanonLayers(recipe);
     expect(layers.override).toBeNull();
+    expect(vi.mocked(loadAestheticOverride)).not.toHaveBeenCalled();
   });
 });

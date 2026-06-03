@@ -1,5 +1,5 @@
 import type { AnthropicRequest, SystemBlock } from './assembler';
-import { loadInvariantLayers } from './canon-layers';
+import { loadInvariantLayers, formatInvariantBlock } from './canon-layers';
 import { NAV_START, NAV_END } from '@/lib/sites/nav-injector';
 import type { NavPage } from '@/lib/sites/nav-injector';
 
@@ -9,7 +9,7 @@ export interface SubpageRequest {
   pageTitle: string;
   pageSlug: string;
   navManifest: NavPage[]; // ALL pages incl. the one being created
-  landingStructure: string; // heading outline of the landing page (raw HTML)
+  landingStructure: string; // raw HTML from the stored artifact; summarized by outlineHtml() internally
 }
 
 const SUBPAGE_DIRECTIVE = `Output ONLY the file. No commentary, no markdown fences, no explanations.
@@ -17,12 +17,12 @@ Include a site navigation element appropriate to the design (it may be visually 
 ${NAV_START}
 <a href="...">...</a>
 ${NAV_END}
-Render ONE link per page listed in the site manifest above. Do not omit these markers.`;
+Render ONE link per page listed in the site manifest above, including a self-link for the page you are generating. Do not omit these markers.`;
 
 export async function assembleSubpageRequest(req: SubpageRequest): Promise<AnthropicRequest> {
   const layers = await loadInvariantLayers();
 
-  const invariantText = `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`;
+  const invariantText = formatInvariantBlock(layers);
 
   const system: SystemBlock[] = [
     {
@@ -75,13 +75,26 @@ export async function assembleSubpageRequest(req: SubpageRequest): Promise<Anthr
 }
 
 /**
+ * Surrogate-safe truncation: cuts `s` to at most `max` characters without
+ * splitting a UTF-16 surrogate pair (which would produce lone surrogates and
+ * ill-formed JSON on the API wire). Appends '…' when truncation occurs.
+ */
+function safeTruncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  let i = max - 1;
+  // don't cut inside a surrogate pair (low surrogate = 0xDC00–0xDFFF)
+  while (i > 0 && (s.charCodeAt(i) & 0xfc00) === 0xdc00) i--;
+  return s.slice(0, i) + '…';
+}
+
+/**
  * Extracts a compact structural summary of an HTML page — h1–h3 text in
  * document order plus a count of <section> elements. Pure string/regex ops,
- * never throws. Caps output at 500 chars.
+ * never throws. Caps output at 500 chars (surrogate-safe).
  *
  * @example
  * outlineHtml('<h1>Foo</h1><h2>Bar</h2><section></section>')
- * // "H1: Foo\nH2: Bar\n(1 sections)"
+ * // "H1: Foo\nH2: Bar\n(1 section)"
  */
 export function outlineHtml(html: string): string {
   try {
@@ -111,12 +124,9 @@ export function outlineHtml(html: string): string {
     }
 
     const headingLines = headings.length > 0 ? headings.join('\n') : '(no headings found)';
-    const full = `${headingLines}\n(${sectionCount} sections)`;
+    const full = `${headingLines}\n(${sectionCount} section${sectionCount === 1 ? '' : 's'})`;
 
-    if (full.length <= 500) return full;
-
-    // Truncate at 500 chars with ellipsis
-    return `${full.slice(0, 499)}…`;
+    return safeTruncate(full, 500);
   } catch {
     return '(no headings found)\n(0 sections)';
   }

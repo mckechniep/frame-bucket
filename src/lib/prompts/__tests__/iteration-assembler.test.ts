@@ -5,14 +5,20 @@ import type { TaxonomyEntry } from '@/lib/types';
 
 // Mock loadCanonLayers so each test controls the layers independently of the
 // filesystem. The loader itself is already tested via assembler.test.ts.
-vi.mock('../canon-layers', () => ({
-  loadCanonLayers: vi.fn().mockResolvedValue({
-    posture: 'POSTURE CONTENT',
-    baseCanon: 'BASE CANON CONTENT',
-    outputContract: 'OUTPUT CONTRACT CONTENT',
-    override: 'AESTHETIC OVERRIDE CONTENT',
-  }),
-}));
+// formatInvariantBlock is kept real (via importOriginal) so iteration-assembler
+// can call it and produce the correct block[1] text.
+vi.mock('../canon-layers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../canon-layers')>();
+  return {
+    ...actual,
+    loadCanonLayers: vi.fn().mockResolvedValue({
+      posture: 'POSTURE CONTENT',
+      baseCanon: 'BASE CANON CONTENT',
+      outputContract: 'OUTPUT CONTRACT CONTENT',
+      override: 'AESTHETIC OVERRIDE CONTENT',
+    }),
+  };
+});
 
 import { loadCanonLayers } from '../canon-layers';
 

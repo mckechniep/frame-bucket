@@ -1,5 +1,5 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
-import { loadCanonLayers } from './canon-layers';
+import { loadCanonLayers, formatInvariantBlock } from './canon-layers';
 import { formatBrief } from './format-brief';
 
 export interface SystemBlock {
@@ -72,7 +72,7 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
     },
     {
       type: 'text',
-      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
+      text: formatInvariantBlock(layers),
       cache_control: { type: 'ephemeral' },
     },
   ];
