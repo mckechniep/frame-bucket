@@ -42,18 +42,18 @@ export function ShareFooter({ token, pageName: _pageName }: ShareFooterProps) {
               contract.md
             </a>
             <a
-              href={`/api/share/${token}/contract?file=scope.md`}
-              download="scope.md"
+              href={`/api/share/${token}/contract?file=tokens.json`}
+              download="tokens.json"
               className="font-[family-name:var(--font-display)] text-[11px] italic text-[var(--color-ink-muted)] no-underline hover:underline"
             >
-              scope.md
+              tokens.json
             </a>
             <a
-              href={`/api/share/${token}/contract?file=timeline.md`}
-              download="timeline.md"
+              href={`/api/share/${token}/contract?file=tokens.css`}
+              download="tokens.css"
               className="font-[family-name:var(--font-display)] text-[11px] italic text-[var(--color-ink-muted)] no-underline hover:underline"
             >
-              timeline.md
+              tokens.css
             </a>
           </div>
         </details>
