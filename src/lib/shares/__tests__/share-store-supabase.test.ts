@@ -210,55 +210,6 @@ describe('SupabaseShareStore', () => {
         // Nothing should have been inserted
         expect(insertFn).not.toHaveBeenCalled();
       });
-
-      it('does not insert share_pages for the legacy path', async () => {
-        const chain = makeChain({
-          data: makeShareRow({ site_id: 'art-legacy' }),
-          error: null,
-        });
-        mockSupabase(() => chain);
-
-        const store = new SupabaseShareStore();
-        const record = await store.create({ artifactId: 'art-legacy', name: 'Legacy Share' });
-
-        // artifactId shim still works
-        expect(record.artifactId).toBe('art-legacy');
-        // pages is empty for legacy path
-        expect(record.pages).toHaveLength(0);
-        // share_pages table was never touched — chain.insert is the shares insert
-        // (legacy path uses the chained .insert().select().single() shape)
-        expect(chain.insert).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('legacy path { artifactId, name }', () => {
-      it('inserts a row and returns a mapped ShareRecord with empty pages', async () => {
-        const chain = makeChain({
-          data: makeShareRow({ site_id: 'art-123', name: 'My Share' }),
-          error: null,
-        });
-        mockSupabase(() => chain);
-
-        const store = new SupabaseShareStore();
-        const record = await store.create({ artifactId: 'art-123', name: 'My Share' });
-
-        expect(record.token).toBe('ABCDEFGHIJKLMNOx');
-        expect(record.artifactId).toBe('art-123');
-        expect(record.name).toBe('My Share');
-        expect(record.revokedAt).toBeNull();
-        expect(record.viewCount).toBe(0);
-        expect(record.pages).toHaveLength(0);
-      });
-
-      it('propagates Supabase errors', async () => {
-        const chain = makeChain({ error: { message: 'duplicate token' } });
-        mockSupabase(() => chain);
-
-        const store = new SupabaseShareStore();
-        await expect(store.create({ artifactId: 'art-123', name: 'My Share' })).rejects.toThrow(
-          /duplicate token/,
-        );
-      });
     });
   });
 

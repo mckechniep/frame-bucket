@@ -87,7 +87,6 @@ const FAKE_SHARE: ShareRecord = {
       position: 1,
     },
   ],
-  artifactId: 'artifact-landing-001',
   name: 'Share Name',
   revokedAt: null,
   lastViewedAt: null,

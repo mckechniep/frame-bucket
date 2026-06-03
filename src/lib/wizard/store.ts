@@ -22,6 +22,8 @@ export interface WizardState {
   rounds: WizardRound[];
   activeArtifactId: string | null;
   compareWithArtifactId: string | null;
+  // siteId added in Task 19 for site-scoped sharing; pages/activeSlug follow in Task 21.
+  siteId: string | null;
 }
 
 export interface WizardActions {
@@ -31,6 +33,7 @@ export interface WizardActions {
   appendRound: (round: WizardRound) => void;
   setActiveArtifactId: (id: string | null) => void;
   setCompareWithArtifactId: (id: string | null) => void;
+  setSiteId: (siteId: string | null) => void;
   setCheckpointName: (artifactId: string, name: string | undefined) => void;
   /**
    * Drop persisted rounds whose artifactIds aren't in `existingIds`. Called
@@ -54,6 +57,7 @@ const initialState: WizardState = {
   rounds: [],
   activeArtifactId: null,
   compareWithArtifactId: null,
+  siteId: null,
 };
 
 export const useWizardStore = create<WizardState & WizardActions>()(
@@ -69,6 +73,7 @@ export const useWizardStore = create<WizardState & WizardActions>()(
 
       setActiveArtifactId: (activeArtifactId) => set({ activeArtifactId }),
       setCompareWithArtifactId: (compareWithArtifactId) => set({ compareWithArtifactId }),
+      setSiteId: (siteId) => set({ siteId }),
 
       setCheckpointName: (artifactId, name) =>
         set((state) => ({
@@ -131,6 +136,7 @@ export const useWizardStore = create<WizardState & WizardActions>()(
         selectedRecipe: state.selectedRecipe,
         rounds: state.rounds,
         activeArtifactId: state.activeArtifactId,
+        siteId: state.siteId,
       }),
     },
   ),

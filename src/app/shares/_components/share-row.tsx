@@ -155,7 +155,7 @@ export function ShareRow({ share }: ShareRowProps) {
       <CreateShareModal
         open={renaming}
         onClose={() => setRenaming(false)}
-        artifactId={share.artifactId}
+        siteId={share.siteId}
         defaultName={share.name}
         editingToken={share.token}
         onSuccess={() => router.refresh()}

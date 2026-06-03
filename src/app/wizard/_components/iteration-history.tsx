@@ -32,6 +32,7 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
   const rounds = useWizardStore((s) => s.rounds);
   const activeArtifactId = useWizardStore((s) => s.activeArtifactId);
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
+  const siteId = useWizardStore((s) => s.siteId);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
   const setCompareWithArtifactId = useWizardStore((s) => s.setCompareWithArtifactId);
 
@@ -65,9 +66,10 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
         {rounds.map((round) => {
           const isActive = round.artifactId === effectiveActiveId;
           const isComparing = compareWithArtifactId === round.artifactId;
-          const hasActiveShare = shares.some(
-            (s) => s.artifactId === round.artifactId && !s.revokedAt,
-          );
+          // Shares are site-scoped (M6): the indicator means "this site has an
+          // active share". All rounds within a session share the same site.
+          const hasActiveShare =
+            siteId !== null && shares.some((s) => s.siteId === siteId && !s.revokedAt);
           return (
             <li
               key={round.artifactId}

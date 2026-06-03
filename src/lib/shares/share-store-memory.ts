@@ -19,33 +19,19 @@ export class MemoryShareStore implements ShareStore {
     const token = generateShareToken();
     const now = new Date().toISOString();
 
-    let siteId: string;
-    let pages: SharePageSnapshot[];
-    let artifactId: string;
-
-    if ('siteId' in input) {
-      // New site-scoped path: deep-copy the caller's pages array so mutations
-      // to the original after create cannot change the stored snapshot.
-      if (input.pages.length === 0) {
-        throw new Error('MemoryShareStore.create: pages must not be empty for site-scoped shares');
-      }
-      siteId = input.siteId;
-      pages = clonePages(input.pages);
-      artifactId = '';
-    } else {
-      // Legacy transitional path: { artifactId, name }.
-      // Produces a record with siteId '' and pages [] so the field is always
-      // populated. Task 19 removes this branch.
-      siteId = '';
-      pages = [];
-      artifactId = input.artifactId;
+    // Fail fast: site-scoped shares must have at least one page.
+    if (input.pages.length === 0) {
+      throw new Error('MemoryShareStore.create: pages must not be empty for site-scoped shares');
     }
+
+    // Deep-copy the caller's pages array so mutations to the original after
+    // create cannot change the stored snapshot.
+    const pages = clonePages(input.pages);
 
     const row: MemoryRow = {
       token,
-      siteId,
+      siteId: input.siteId,
       pages,
-      artifactId,
       name: input.name,
       revokedAt: null,
       lastViewedAt: null,

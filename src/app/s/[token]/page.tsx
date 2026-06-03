@@ -38,9 +38,21 @@ export default async function SharePage({ params }: { params: Promise<{ token: s
     );
   }
 
-  // Active path: fetch the underlying artifact from the archive.
+  // Active path: fetch the landing page artifact (position 0) from the archive.
+  // Shares are site-scoped (M6) — the landing page is the first page by position.
+  const landingPage = share.pages.find((p) => p.position === 0) ?? share.pages[0];
+  if (!landingPage) {
+    // Share exists but has no pages — show the "missing" variant.
+    return (
+      <>
+        <RevokedView name={share.name} reason="missing" />
+        <ShareFooter />
+      </>
+    );
+  }
+
   const archive = defaultArchiveStore();
-  const artifact = await archive.read(share.artifactId);
+  const artifact = await archive.read(landingPage.artifactId);
   if (!artifact) {
     // Share exists but artifact gone — show the "missing" variant of revoked.
     return (

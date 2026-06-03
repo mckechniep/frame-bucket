@@ -19,27 +19,10 @@ export interface SharePageSnapshot {
  */
 export interface ShareRecord {
   token: string;
-  /**
-   * The site this share points at.
-   * Empty string ('') on transitional records created via the legacy
-   * `{ artifactId, name }` input path. Task 19 removes the legacy path.
-   */
+  /** The site this share points at. */
   siteId: string;
-  /**
-   * Snapshot of the site's pages at the time the share was created.
-   * Empty array on transitional records created via the legacy
-   * `{ artifactId, name }` input path. Task 19 removes the legacy path.
-   */
+  /** Snapshot of the site's pages at the time the share was created. */
   pages: SharePageSnapshot[];
-  /**
-   * @deprecated Transitional field — carried over from the pre-M6 share
-   * shape where shares pointed at a single artifact. This field is still
-   * populated by the legacy `{ artifactId, name }` create path so that
-   * callers (api/share route, /shares components, wizard) continue to
-   * compile until Tasks 15-19 migrate them to site-scoping. Task 19
-   * removes this field and the legacy create path entirely.
-   */
-  artifactId: string;
   name: string;
   revokedAt: string | null;
   lastViewedAt: string | null;
@@ -50,19 +33,10 @@ export interface ShareRecord {
 /**
  * Input for creating a new share.
  *
- * Two shapes are accepted during the M6 transition period:
- *  - New (site-scoped): `{ siteId, name, pages }` — pins a snapshot of the
- *    site's current page manifest. This is the shape Tasks 15-19 will migrate
- *    all callers to.
- *  - Legacy (transitional): `{ artifactId, name }` — carried over from M5 so
- *    the api/share route and wizard compile without changes until Task 19.
- *    Records created via the legacy path have `siteId: ''` and `pages: []`.
- *
- * Task 19 removes the legacy branch of this union.
+ * Pins a snapshot of the site's current page manifest so recipients see
+ * exactly what was shared — later edits to the site require a new share.
  */
-export type CreateShareInput =
-  | { siteId: string; name: string; pages: SharePageSnapshot[] }
-  | { artifactId: string; name: string };
+export type CreateShareInput = { siteId: string; name: string; pages: SharePageSnapshot[] };
 
 /**
  * Contract for storing and querying share metadata. Two implementations:
@@ -75,9 +49,8 @@ export interface ShareStore {
   /**
    * Creates a new share with a fresh unguessable token.
    *
-   * Accepts either the new site-scoped input `{ siteId, name, pages }` or
-   * the legacy transitional input `{ artifactId, name }`. See
-   * {@link CreateShareInput} for details.
+   * Accepts `{ siteId, name, pages }` — see {@link CreateShareInput} for details.
+   * The pages array must be non-empty; throws otherwise.
    */
   create(input: CreateShareInput): Promise<ShareRecord>;
 

@@ -42,6 +42,8 @@ export function StepGenerate() {
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
   const appendRound = useWizardStore((s) => s.appendRound);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
+  const setSiteId = useWizardStore((s) => s.setSiteId);
+  const siteId = useWizardStore((s) => s.siteId);
 
   const hasExistingRound = rounds.length > 0;
 
@@ -109,14 +111,20 @@ export function StepGenerate() {
       });
     }
     setActiveArtifactId(stream.artifactId);
+    // Capture the site created during generation so share creation is site-scoped.
+    if (stream.siteId) {
+      setSiteId(stream.siteId);
+    }
   }, [
     stream.phase,
     stream.artifactId,
+    stream.siteId,
     stream.cost,
     rounds,
     selectedRecipe,
     appendRound,
     setActiveArtifactId,
+    setSiteId,
   ]);
 
   const handleRefine = useCallback(
@@ -242,7 +250,11 @@ export function StepGenerate() {
           ) : null}
 
           {hasExistingRound && !isStreaming && previewArtifactId ? (
-            <FinishActions artifactId={previewArtifactId} onShareCreated={refreshShares} />
+            <FinishActions
+              artifactId={previewArtifactId}
+              siteId={siteId}
+              onShareCreated={refreshShares}
+            />
           ) : null}
 
           {hasExistingRound ? (
@@ -394,10 +406,11 @@ function GeneratingPane({ phase, imageCount, isIteration }: GeneratingPaneProps)
 
 interface FinishActionsProps {
   artifactId: string;
+  siteId: string | null;
   onShareCreated?: () => void;
 }
 
-function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
+function FinishActions({ artifactId, siteId, onShareCreated }: FinishActionsProps) {
   const brief = useWizardStore((s) => s.brief);
   const rounds = useWizardStore((s) => s.rounds);
   const [shareOpen, setShareOpen] = useState(false);
@@ -425,7 +438,8 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+            disabled={!siteId}
+            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Create share link
           </button>
@@ -450,7 +464,7 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
       <CreateShareModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
-        artifactId={artifactId}
+        siteId={siteId}
         defaultName={defaultName}
         onSuccess={onShareCreated}
       />

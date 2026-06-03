@@ -15,12 +15,14 @@ function makePage(overrides?: Partial<SharePageSnapshot>): SharePageSnapshot {
 
 describe('MemoryShareStore', () => {
   describe('create', () => {
-    it('returns a record with a valid token, default state, and createdAt', async () => {
+    it('returns a record with a valid token, siteId, pages, and createdAt', async () => {
       const store = new MemoryShareStore();
-      const r = await store.create({ artifactId: 'a1', name: 'first share' });
+      const pages = [makePage()];
+      const r = await store.create({ siteId: 'site-1', name: 'first share', pages });
       expect(r.token).toMatch(/^[A-Za-z0-9]{16}$/);
-      expect(r.artifactId).toBe('a1');
+      expect(r.siteId).toBe('site-1');
       expect(r.name).toBe('first share');
+      expect(r.pages).toHaveLength(1);
       expect(r.revokedAt).toBeNull();
       expect(r.lastViewedAt).toBeNull();
       expect(r.viewCount).toBe(0);
@@ -29,8 +31,9 @@ describe('MemoryShareStore', () => {
 
     it('two creates produce two distinct tokens', async () => {
       const store = new MemoryShareStore();
-      const a = await store.create({ artifactId: 'a1', name: 'a' });
-      const b = await store.create({ artifactId: 'a1', name: 'b' });
+      const pages = [makePage()];
+      const a = await store.create({ siteId: 'site-1', name: 'a', pages });
+      const b = await store.create({ siteId: 'site-1', name: 'b', pages });
       expect(a.token).not.toBe(b.token);
     });
 
@@ -164,15 +167,6 @@ describe('MemoryShareStore', () => {
         store.create({ siteId: 'site-abc', name: 'No Pages', pages: [] }),
       ).rejects.toThrow(/pages must not be empty/);
     });
-
-    it('legacy create (transitional) — { artifactId, name } still works; siteId is empty string, pages empty', async () => {
-      const store = new MemoryShareStore();
-      const r = await store.create({ artifactId: 'art-legacy', name: 'legacy share' });
-      expect(r.artifactId).toBe('art-legacy');
-      expect(r.siteId).toBe('');
-      expect(r.pages).toEqual([]);
-      expect(r.token).toMatch(/^[A-Za-z0-9]{16}$/);
-    });
   });
 
   describe('findByToken', () => {
@@ -183,7 +177,7 @@ describe('MemoryShareStore', () => {
 
     it('returns the record for an existing token', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       const found = await store.findByToken(created.token);
       expect(found?.token).toBe(created.token);
     });
@@ -209,9 +203,9 @@ describe('MemoryShareStore', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
       const store = new MemoryShareStore();
-      const first = await store.create({ artifactId: 'a1', name: 'first' });
+      const first = await store.create({ siteId: 'site-1', name: 'first', pages: [makePage()] });
       vi.setSystemTime(new Date('2026-01-02T00:00:00Z'));
-      const second = await store.create({ artifactId: 'a2', name: 'second' });
+      const second = await store.create({ siteId: 'site-1', name: 'second', pages: [makePage()] });
       const all = await store.list();
       expect(all.length).toBe(2);
       expect(all[0]!.token).toBe(second.token);
@@ -238,7 +232,7 @@ describe('MemoryShareStore', () => {
   describe('rename', () => {
     it('updates the name and returns the updated record', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'old' });
+      const created = await store.create({ siteId: 'site-1', name: 'old', pages: [makePage()] });
       const updated = await store.rename(created.token, 'new');
       expect(updated?.name).toBe('new');
       const refetch = await store.findByToken(created.token);
@@ -254,7 +248,7 @@ describe('MemoryShareStore', () => {
   describe('revoke', () => {
     it('sets revokedAt and returns the record', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       const revoked = await store.revoke(created.token);
       expect(revoked?.revokedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
@@ -263,7 +257,7 @@ describe('MemoryShareStore', () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       const first = await store.revoke(created.token);
       vi.setSystemTime(new Date('2026-01-02T00:00:00Z'));
       const second = await store.revoke(created.token);
@@ -288,7 +282,7 @@ describe('MemoryShareStore', () => {
 
     it('records the first view and bumps view_count to 1', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       const recorded = await store.trackViewIfNotRecent(created.token, 5 * 60 * 1000);
       expect(recorded).toBe(true);
       const refetch = await store.findByToken(created.token);
@@ -298,7 +292,7 @@ describe('MemoryShareStore', () => {
 
     it('returns false on a repeat call within the same window', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       await store.trackViewIfNotRecent(created.token, 5 * 60 * 1000);
       const second = await store.trackViewIfNotRecent(created.token, 5 * 60 * 1000);
       expect(second).toBe(false);
@@ -308,7 +302,7 @@ describe('MemoryShareStore', () => {
 
     it('records a view in the next window after the throttle expires', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       await store.trackViewIfNotRecent(created.token, 5 * 60 * 1000);
       // Advance past the bucket boundary
       vi.setSystemTime(new Date(Date.now() + 6 * 60 * 1000));
@@ -320,7 +314,7 @@ describe('MemoryShareStore', () => {
 
     it('returns false for a revoked share', async () => {
       const store = new MemoryShareStore();
-      const created = await store.create({ artifactId: 'a1', name: 'n' });
+      const created = await store.create({ siteId: 'site-1', name: 'n', pages: [makePage()] });
       await store.revoke(created.token);
       const recorded = await store.trackViewIfNotRecent(created.token, 5 * 60 * 1000);
       expect(recorded).toBe(false);

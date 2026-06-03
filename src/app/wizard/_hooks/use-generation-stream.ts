@@ -45,6 +45,8 @@ export interface GenerationStreamResult {
   html: string;
   imageCount: number;
   artifactId: string | null;
+  /** The site created during generation. Populated on `done`. */
+  siteId: string | null;
   cost: number | null;
   usage: GenerationStreamUsage | null;
   imagesInjected: number | null;
@@ -56,6 +58,7 @@ const INITIAL_RESULT: GenerationStreamResult = {
   html: '',
   imageCount: 0,
   artifactId: null,
+  siteId: null,
   cost: null,
   usage: null,
   imagesInjected: null,
@@ -64,6 +67,7 @@ const INITIAL_RESULT: GenerationStreamResult = {
 
 interface SSEDataDone {
   artifactId?: string;
+  siteId?: string;
   cost?: number;
   usage?: GenerationStreamUsage;
   imagesInjected?: number;
@@ -197,6 +201,7 @@ export function useGenerationStream(
                 html: accHtml,
                 imageCount,
                 artifactId: d.artifactId ?? null,
+                siteId: d.siteId ?? null,
                 cost: d.cost ?? null,
                 usage: d.usage ?? null,
                 imagesInjected: d.imagesInjected ?? null,

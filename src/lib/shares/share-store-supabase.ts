@@ -25,63 +25,48 @@ export class SupabaseShareStore implements ShareStore {
     const sb = supabaseServer();
     const token = generateShareToken();
 
-    if ('siteId' in input) {
-      // Fail fast: site-scoped shares must have at least one page.
-      if (input.pages.length === 0) {
-        throw new Error(
-          'SupabaseShareStore.create: pages must not be empty for site-scoped shares',
-        );
-      }
-
-      // New site-scoped path: insert shares row + share_pages rows.
-      const { error: shareErr } = await sb
-        .from('shares')
-        .insert({ token, site_id: input.siteId, name: input.name });
-      if (shareErr) throw new Error(`SupabaseShareStore.create (shares): ${shareErr.message}`);
-
-      // Batch-insert all page snapshots.
-      const pageRows = input.pages.map((p) => ({
-        token,
-        slug: p.slug,
-        title: p.title,
-        artifact_id: p.artifactId,
-        position: p.position,
-      }));
-
-      const { error: pagesErr } = await sb.from('share_pages').insert(pageRows);
-      if (pagesErr) {
-        // Manual rollback: delete the shares row we just inserted so we don't
-        // leave an orphan share with no pages. Supabase JS has no transactions.
-        const { error: rollbackErr } = await sb.from('shares').delete().eq('token', token);
-        if (rollbackErr) {
-          console.error(
-            `[SupabaseShareStore.create] rollback failed for token ${token}: ${rollbackErr.message}`,
-          );
-        }
-        throw new Error(`SupabaseShareStore.create (share_pages): ${pagesErr.message}`);
-      }
-
-      // Re-fetch the shares row so created_at and other DB-set fields are accurate.
-      const { data: shareData, error: fetchErr } = await sb
-        .from('shares')
-        .select('*')
-        .eq('token', token)
-        .single();
-      if (fetchErr) throw new Error(`SupabaseShareStore.create (fetch): ${fetchErr.message}`);
-
-      return rowToRecord(shareData as ShareRow, input.pages);
+    // Fail fast: site-scoped shares must have at least one page.
+    if (input.pages.length === 0) {
+      throw new Error('SupabaseShareStore.create: pages must not be empty for site-scoped shares');
     }
 
-    // TRANSITIONAL SHIM — legacy `{ artifactId, name }` path.
-    // Writes site_id = artifactId, no share_pages rows.
-    // Task 19 removes this branch entirely.
-    const { data, error } = await sb
+    // Insert the shares row.
+    const { error: shareErr } = await sb
       .from('shares')
-      .insert({ token, site_id: input.artifactId, name: input.name })
+      .insert({ token, site_id: input.siteId, name: input.name });
+    if (shareErr) throw new Error(`SupabaseShareStore.create (shares): ${shareErr.message}`);
+
+    // Batch-insert all page snapshots.
+    const pageRows = input.pages.map((p) => ({
+      token,
+      slug: p.slug,
+      title: p.title,
+      artifact_id: p.artifactId,
+      position: p.position,
+    }));
+
+    const { error: pagesErr } = await sb.from('share_pages').insert(pageRows);
+    if (pagesErr) {
+      // Manual rollback: delete the shares row we just inserted so we don't
+      // leave an orphan share with no pages. Supabase JS has no transactions.
+      const { error: rollbackErr } = await sb.from('shares').delete().eq('token', token);
+      if (rollbackErr) {
+        console.error(
+          `[SupabaseShareStore.create] rollback failed for token ${token}: ${rollbackErr.message}`,
+        );
+      }
+      throw new Error(`SupabaseShareStore.create (share_pages): ${pagesErr.message}`);
+    }
+
+    // Re-fetch the shares row so created_at and other DB-set fields are accurate.
+    const { data: shareData, error: fetchErr } = await sb
+      .from('shares')
       .select('*')
+      .eq('token', token)
       .single();
-    if (error) throw new Error(`SupabaseShareStore.create: ${error.message}`);
-    return rowToRecord(data as ShareRow, []);
+    if (fetchErr) throw new Error(`SupabaseShareStore.create (fetch): ${fetchErr.message}`);
+
+    return rowToRecord(shareData as ShareRow, input.pages);
   }
 
   async findByToken(token: string): Promise<ShareRecord | null> {
@@ -274,10 +259,6 @@ function rowToRecord(row: ShareRow, pages: SharePageSnapshot[]): ShareRecord {
     token: row.token,
     siteId: row.site_id,
     pages,
-    // TRANSITIONAL SHIM: artifactId carries site_id for backward compat with
-    // callers that still read the deprecated field (Tasks 15-19 migrate them;
-    // Task 19 removes this field and the legacy create path entirely).
-    artifactId: row.site_id,
     name: row.name,
     revokedAt: row.revoked_at,
     lastViewedAt: row.last_viewed_at,

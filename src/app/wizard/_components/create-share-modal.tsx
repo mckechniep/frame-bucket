@@ -7,7 +7,8 @@ const MAX_NAME_LENGTH = 120;
 interface CreateShareModalProps {
   open: boolean;
   onClose: () => void;
-  artifactId: string;
+  /** The site to create a share for. Required for create mode; unused in rename mode. */
+  siteId: string | null;
   defaultName: string;
   editingToken?: string;
   onSuccess?: () => void;
@@ -35,7 +36,7 @@ export function CreateShareModal(props: CreateShareModalProps) {
 
 function CreateShareModalInner({
   onClose,
-  artifactId,
+  siteId,
   defaultName,
   editingToken,
   onSuccess,
@@ -96,7 +97,7 @@ function CreateShareModalInner({
         const res = await fetch('/api/share', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ artifactId, name: trimmed }),
+          body: JSON.stringify({ siteId, name: trimmed }),
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as ErrorBody;
