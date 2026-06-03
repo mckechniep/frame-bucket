@@ -145,6 +145,49 @@ Rules with trailing whitespace.`;
     // Rules should not contain Component Patterns content
     expect(result.rules).not.toContain('Nav: fixed top');
   });
+
+  it('## Identity inside a fenced code block in How-to-Extend does NOT corrupt the real Identity section', () => {
+    const text = `## Identity
+A dark cyberpunk aesthetic.
+
+## Rules
+1. Never use white backgrounds.
+
+## Component Patterns
+Nav: fixed top.
+
+## How to Extend
+When adding new tokens, structure them like this:
+
+\`\`\`
+## Identity
+--color-new: #ff0000; /* example snippet */
+\`\`\`
+
+See token conventions above.`;
+    const result = parseNarrativeSections(text);
+    // Real Identity section must be the genuine prose, not the snippet
+    expect(result.identity).toBe('A dark cyberpunk aesthetic.');
+    // How-to-Extend must still contain its code block and surrounding prose
+    expect(result.howToExtend).toContain('When adding new tokens');
+    expect(result.howToExtend).toContain('See token conventions above');
+  });
+
+  // Intentional strictness: only bare ## H2 headings trigger section splits.
+  // ### H3 and **bold-wrapped** headings do not match — acknowledged graceful-degradation cases.
+  it('### Identity (H3) does NOT match — section comes back empty (graceful degradation)', () => {
+    const text = `### Identity
+This is under an H3 heading, not H2.`;
+    const result = parseNarrativeSections(text);
+    expect(result.identity).toBe('');
+  });
+
+  it('**## Identity** (bold-wrapped) does NOT match — section comes back empty (graceful degradation)', () => {
+    const text = `**## Identity**
+This heading is bold-wrapped.`;
+    const result = parseNarrativeSections(text);
+    expect(result.identity).toBe('');
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -210,6 +253,12 @@ describe('generateNarrative — happy path', () => {
     expect(options?.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('passes maxRetries: 0 in the options to disable SDK retry loops', async () => {
+    await generateNarrative(makeTokens(), HTML, RECIPE);
+    const [, options] = mockCreate.mock.calls[0] as [unknown, { maxRetries?: number }];
+    expect(options?.maxRetries).toBe(0);
+  });
+
   it('cost is computed from usage tokens', async () => {
     // 800 input + 400 output at haiku rates: 800*1/1e6 + 400*5/1e6 = 0.000800 + 0.002000 = 0.0028
     const result = await generateNarrative(makeTokens(), HTML, RECIPE);
@@ -272,13 +321,12 @@ describe('generateNarrative — API error fallback', () => {
 
   it('API rejection → returns all-empty narrative, no throw', async () => {
     mockCreate.mockRejectedValueOnce(new Error('API unavailable'));
-    await expect(generateNarrative(makeTokens(), HTML, RECIPE)).resolves.not.toThrow();
     const result = await generateNarrative(makeTokens(), HTML, RECIPE);
-    // The second call: reset mockCreate again for the second call
     expect(result.narrative.identity).toBe('');
     expect(result.narrative.rules).toBe('');
     expect(result.narrative.componentPatterns).toBe('');
     expect(result.narrative.howToExtend).toBe('');
+    expect(result.cost).toBe(0);
   });
 
   it('API error → returns cost 0', async () => {

@@ -6,8 +6,11 @@ import type { ContractNarrative, DesignTokens } from './types';
 export const NARRATIVE_MODEL = 'claude-haiku-4-5';
 export const NARRATIVE_MAX_TOKENS = 2048;
 
-/** The four heading strings the model is instructed to use. */
-const HEADINGS = ['## Identity', '## Rules', '## Component Patterns', '## How to Extend'] as const;
+// Neutralize fenced code blocks so heading-like lines inside examples
+// (e.g. a "## Identity" snippet in How-to-Extend) can't trigger a false section split.
+function maskCodeFences(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, (block) => block.replace(/^##\s.*$/gm, '<!-- masked -->'));
+}
 
 /**
  * Parse the four narrative sections out of the model's response text.
@@ -30,8 +33,12 @@ export function parseNarrativeSections(text: string): ContractNarrative {
 
   if (!text.trim()) return result;
 
+  // Neutralize heading-like lines inside fenced code blocks before splitting,
+  // so a "## Identity" example snippet in How-to-Extend can't corrupt parsing.
+  const masked = maskCodeFences(text);
+
   // Split into chunks; odd indices are headings, even indices are content after.
-  const parts = text.split(headingPattern);
+  const parts = masked.split(headingPattern);
   // parts[0] = text before first heading (discard)
   // parts[1] = first heading, parts[2] = content after first heading, etc.
 
@@ -74,6 +81,9 @@ const EMPTY_NARRATIVE: ContractNarrative = {
  * Rule 9 discipline:
  *   - max_tokens capped at NARRATIVE_MAX_TOKENS (2048)
  *   - Hard AbortSignal.timeout(30s) — the call cannot run away
+ *   - maxRetries: 0 — no SDK retry loops that extend billing past the timeout
+ *     (max_tokens cap + 30s hard timeout + no retries = call cannot run away
+ *     or exceed its budget; see Rule 9 / billable-stream discipline)
  *   - Any failure → silent fallback (empty narrative), cost 0
  *   - The caller (Task 8) renders a tokens-only contract when narrative is empty
  */
@@ -92,7 +102,7 @@ export async function generateNarrative(
         system,
         messages: [{ role: 'user', content: user }],
       },
-      { signal: AbortSignal.timeout(30_000) },
+      { signal: AbortSignal.timeout(30_000), maxRetries: 0 },
     );
 
     // Extract the first text block from the response content array.
@@ -121,6 +131,3 @@ export async function generateNarrative(
     return { narrative: { ...EMPTY_NARRATIVE }, modelId: NARRATIVE_MODEL, cost: 0 };
   }
 }
-
-// Re-export so callers can reference HEADINGS if needed for display
-export { HEADINGS };

@@ -103,6 +103,7 @@ Do not include any other top-level markdown headings. Do not fabricate token val
   const truncatedHtml = htmlSource.slice(0, MAX_HTML_CHARS);
   const tokenBlock = serializeTokens(tokens);
 
+  // The four headings below are structural cues for the model — not parsed by this module.
   const user = `## Recipe / Site Summary
 ${recipeSummary || '(not provided)'}
 
