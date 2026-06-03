@@ -79,10 +79,10 @@ export function ShareRow({ share, siteName }: ShareRowProps) {
           >
             {share.name}
           </span>
-          <p className="font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
+          <div className="font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
             {siteName} &middot;{' '}
             {share.pages.length === 1 ? '1 page' : `${share.pages.length} pages`}
-          </p>
+          </div>
           <div className="flex items-center gap-[var(--space-2)] font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink-muted)]">
             <span aria-label={`Share token ending in ${tokenFragment}`}>…{tokenFragment}</span>
             <button

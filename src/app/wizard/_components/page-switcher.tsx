@@ -7,9 +7,17 @@ interface PageSwitcherProps {
   activeSlug: string;
   onSwitch: (slug: string) => void;
   onAddPage: () => void;
+  /** When true, all page-switch and add-page interactions are disabled. */
+  disabled?: boolean;
 }
 
-export function PageSwitcher({ pages, activeSlug, onSwitch, onAddPage }: PageSwitcherProps) {
+export function PageSwitcher({
+  pages,
+  activeSlug,
+  onSwitch,
+  onAddPage,
+  disabled = false,
+}: PageSwitcherProps) {
   // Hidden before generation produces any pages.
   if (pages.length === 0) return null;
 
@@ -27,9 +35,10 @@ export function PageSwitcher({ pages, activeSlug, onSwitch, onAddPage }: PageSwi
             key={page.slug}
             type="button"
             onClick={() => onSwitch(page.slug)}
+            disabled={disabled}
             aria-current={isActive ? 'page' : undefined}
             className={[
-              'shrink-0 rounded-[var(--radius-sm)] px-[var(--space-3)] py-[var(--space-1)] font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.12em] transition-colors duration-[var(--duration-fast)]',
+              'shrink-0 rounded-[var(--radius-sm)] px-[var(--space-3)] py-[var(--space-1)] font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.12em] transition-colors duration-[var(--duration-fast)] disabled:cursor-not-allowed disabled:opacity-50',
               isActive
                 ? 'text-[var(--color-accent)] underline underline-offset-4'
                 : 'text-[var(--color-ink-muted)] hover:text-[var(--color-ink)]',
@@ -45,7 +54,8 @@ export function PageSwitcher({ pages, activeSlug, onSwitch, onAddPage }: PageSwi
       <button
         type="button"
         onClick={onAddPage}
-        className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-1)] font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.12em] text-[var(--color-ink-muted)] transition-all duration-[var(--duration-fast)] hover:-translate-y-px hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+        disabled={disabled}
+        className="shrink-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-1)] font-[family-name:var(--font-mono)] text-[var(--text-base)] uppercase tracking-[0.12em] text-[var(--color-ink-muted)] transition-all duration-[var(--duration-fast)] hover:-translate-y-px hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-50"
       >
         + Add page
       </button>

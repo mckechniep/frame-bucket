@@ -35,6 +35,7 @@ interface IterateOverride {
 interface IterationContext {
   parentArtifactId: string;
   parentRound: number;
+  targetSlug: string;
 }
 
 export function StepGenerate() {
@@ -110,7 +111,10 @@ export function StepGenerate() {
       });
       // Advance the active page's stored artifact pointer so switching away
       // from and back to this page shows the iterated artifact, not the original.
-      setPageArtifact(activeSlug, stream.artifactId);
+      // Use the slug captured at submit time (iterationCtx.targetSlug) — not
+      // the live activeSlug — to guard against the user switching pages while
+      // the stream is in-flight (stale-closure bug).
+      setPageArtifact(iterationCtx.targetSlug, stream.artifactId);
       iterationContextRef.current = null;
     } else {
       appendRound({
@@ -141,7 +145,6 @@ export function StepGenerate() {
     rounds,
     pages.length,
     selectedRecipe,
-    activeSlug,
     appendRound,
     setActiveArtifactId,
     setSite,
@@ -161,6 +164,7 @@ export function StepGenerate() {
       iterationContextRef.current = {
         parentArtifactId: latest.artifactId,
         parentRound: latest.iterationRound,
+        targetSlug: activeSlug,
       };
       setIterateOverride({
         runKey: `iterate:${latest.artifactId}:${Date.now()}`,
@@ -171,8 +175,9 @@ export function StepGenerate() {
           feedback,
           // Pass site context so the route advances site_pages.artifact_id
           // server-side alongside the client-side setPageArtifact call.
-          ...(siteId ? { siteId } : {}),
-          ...(activeSlug ? { slug: activeSlug } : {}),
+          // undefined values are dropped by JSON.stringify; Zod schema accepts both as optional.
+          siteId: siteId ?? undefined,
+          slug: activeSlug || undefined,
         },
       });
     },
@@ -260,6 +265,7 @@ export function StepGenerate() {
             activeSlug={activeSlug}
             onSwitch={handleSwitch}
             onAddPage={() => setAddPageOpen(true)}
+            disabled={isStreaming}
           />
 
           {showGeneratingPane ? (

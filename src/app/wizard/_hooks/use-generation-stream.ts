@@ -115,8 +115,10 @@ export function useGenerationStream(
               feedback: request.feedback,
               // When present, the route also advances site_pages.artifact_id
               // server-side so the page pointer stays in sync.
-              ...(request.siteId ? { siteId: request.siteId } : {}),
-              ...(request.slug ? { slug: request.slug } : {}),
+              // undefined values are dropped by JSON.stringify — no need for
+              // conditional spreads, and the Zod schema accepts both as optional.
+              siteId: request.siteId,
+              slug: request.slug,
             };
 
     const { promise, release } = dedupedRequest(`${request.kind}:${runKey}`, async (signal) => {
