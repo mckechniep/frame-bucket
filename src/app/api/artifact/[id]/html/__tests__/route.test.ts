@@ -100,3 +100,80 @@ describe('GET /api/artifact/[id]/html — bad request', () => {
     expect(readSpy).not.toHaveBeenCalled();
   });
 });
+
+describe('GET /api/artifact/[id]/html — path-traversal hardening', () => {
+  it('returns 404 for a path-traversal id and does NOT call store.read', async () => {
+    const res = await GET(makeGetRequest(), withParams('../../etc/passwd'));
+
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.error).toBeDefined();
+    expect(readSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for an id with a dot in it (not in allowed charset)', async () => {
+    const res = await GET(makeGetRequest(), withParams('../secret'));
+
+    expect(res.status).toBe(404);
+    expect(readSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for an id with a slash', async () => {
+    const res = await GET(makeGetRequest(), withParams('foo/bar'));
+
+    expect(res.status).toBe(404);
+    expect(readSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for an id that is too long (> 64 chars)', async () => {
+    const longId = 'a'.repeat(65);
+    const res = await GET(makeGetRequest(), withParams(longId));
+
+    expect(res.status).toBe(404);
+    expect(readSpy).not.toHaveBeenCalled();
+  });
+
+  it('accepts a valid timestamp-format id (passes the shape guard)', async () => {
+    const sampleHtml = '<html></html>';
+    setupStore({
+      read: () => ({
+        html: sampleHtml,
+        recipeSummary: '',
+        modelId: '',
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cost: 0,
+        generatedAt: '',
+        iterationRound: 0,
+      }),
+    });
+
+    const res = await GET(makeGetRequest(), withParams('20260602-160516-468c'));
+
+    expect(res.status).toBe(200);
+    expect(readSpy).toHaveBeenCalledWith('20260602-160516-468c');
+  });
+
+  it('accepts a valid UUID-format id (passes the shape guard)', async () => {
+    const sampleHtml = '<html></html>';
+    setupStore({
+      read: () => ({
+        html: sampleHtml,
+        recipeSummary: '',
+        modelId: '',
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cost: 0,
+        generatedAt: '',
+        iterationRound: 0,
+      }),
+    });
+
+    const res = await GET(makeGetRequest(), withParams('a1b2c3d4-e5f6-7890-abcd-ef1234567890'));
+
+    expect(res.status).toBe(200);
+    expect(readSpy).toHaveBeenCalledWith('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+  });
+});

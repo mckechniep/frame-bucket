@@ -1,4 +1,5 @@
 import { defaultArchiveStore } from '@/lib/generation/archive';
+import { isValidArtifactId } from '@/lib/generation/artifact-id';
 
 export const runtime = 'nodejs';
 
@@ -24,6 +25,14 @@ export async function GET(
 
   if (!id) {
     return Response.json({ error: 'artifact id is required' }, { status: 400 });
+  }
+
+  // Defense-in-depth: reject ids that don't match the canonical shape
+  // ([A-Za-z0-9-], ≤ 64 chars) before they reach the archive store.
+  // A traversal attempt like `../../etc/passwd` is treated as not-found (404)
+  // rather than forwarded to the fs layer. Mirrors isValidToken() style.
+  if (!isValidArtifactId(id)) {
+    return Response.json({ error: 'artifact not found' }, { status: 404 });
   }
 
   const artifact = await defaultArchiveStore().read(id);
