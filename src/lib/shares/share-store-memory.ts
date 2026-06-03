@@ -1,4 +1,4 @@
-import type { ShareRecord, ShareStore } from './share-store';
+import type { CreateShareInput, SharePageSnapshot, ShareRecord, ShareStore } from './share-store';
 import { generateShareToken } from './token';
 
 interface MemoryRow extends ShareRecord {
@@ -7,16 +7,43 @@ interface MemoryRow extends ShareRecord {
   viewBuckets: Set<number>;
 }
 
+/** Returns a deep copy of a pages snapshot array. */
+function clonePages(pages: SharePageSnapshot[]): SharePageSnapshot[] {
+  return pages.map((p) => ({ ...p }));
+}
+
 export class MemoryShareStore implements ShareStore {
   private rows = new Map<string, MemoryRow>();
 
-  async create({ artifactId, name }: { artifactId: string; name: string }): Promise<ShareRecord> {
+  async create(input: CreateShareInput): Promise<ShareRecord> {
     const token = generateShareToken();
     const now = new Date().toISOString();
+
+    let siteId: string;
+    let pages: SharePageSnapshot[];
+    let artifactId: string;
+
+    if ('siteId' in input) {
+      // New site-scoped path: deep-copy the caller's pages array so mutations
+      // to the original after create cannot change the stored snapshot.
+      siteId = input.siteId;
+      pages = clonePages(input.pages);
+      artifactId = '';
+    } else {
+      // Legacy transitional path: { artifactId, name }.
+      // Produces a record with siteId '' and pages [] so the field is always
+      // populated. Task 19 removes this branch.
+      siteId = '';
+      pages = [];
+      artifactId = input.artifactId;
+    }
+
     const row: MemoryRow = {
       token,
+      siteId,
+      pages,
       artifactId,
-      name,
+      name: input.name,
       revokedAt: null,
       lastViewedAt: null,
       viewCount: 0,
@@ -66,8 +93,9 @@ export class MemoryShareStore implements ShareStore {
 }
 
 function rowToRecord(row: MemoryRow): ShareRecord {
-  // Strip the internal viewBuckets Set before returning
+  // Strip the internal viewBuckets Set before returning.
+  // Deep-copy pages so callers cannot mutate internal snapshot state.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { viewBuckets, ...record } = row;
-  return record;
+  const { viewBuckets, pages, ...rest } = row;
+  return { ...rest, pages: clonePages(pages) };
 }

@@ -1,5 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import type { SharePageSnapshot } from '../share-store';
 import { MemoryShareStore } from '../share-store-memory';
+
+/** Minimal page snapshot factory for test helpers. */
+function makePage(overrides?: Partial<SharePageSnapshot>): SharePageSnapshot {
+  return {
+    slug: '/',
+    title: 'Home',
+    artifactId: 'art-001',
+    position: 0,
+    ...overrides,
+  };
+}
 
 describe('MemoryShareStore', () => {
   describe('create', () => {
@@ -21,6 +33,64 @@ describe('MemoryShareStore', () => {
       const b = await store.create({ artifactId: 'a1', name: 'b' });
       expect(a.token).not.toBe(b.token);
     });
+
+    // ── site-scoped path ──────────────────────────────────────────────────
+
+    it('site-scoped create stores siteId, pages, and initial state', async () => {
+      const store = new MemoryShareStore();
+      const pages: SharePageSnapshot[] = [
+        makePage({ slug: '/', title: 'Home', position: 0 }),
+        makePage({ slug: '/about', title: 'About', artifactId: 'art-002', position: 1 }),
+      ];
+      const r = await store.create({ siteId: 'site-abc', name: 'My Site Share', pages });
+      expect(r.token).toMatch(/^[A-Za-z0-9]{16}$/);
+      expect(r.siteId).toBe('site-abc');
+      expect(r.name).toBe('My Site Share');
+      expect(r.pages).toHaveLength(2);
+      expect(r.pages[0]).toEqual({ slug: '/', title: 'Home', artifactId: 'art-001', position: 0 });
+      expect(r.pages[1]).toEqual({
+        slug: '/about',
+        title: 'About',
+        artifactId: 'art-002',
+        position: 1,
+      });
+      expect(r.revokedAt).toBeNull();
+      expect(r.viewCount).toBe(0);
+      expect(r.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('snapshot immutability — mutating the input pages after create does not change the stored snapshot', async () => {
+      const store = new MemoryShareStore();
+      const pages: SharePageSnapshot[] = [makePage()];
+      const r = await store.create({ siteId: 'site-abc', name: 'snap', pages });
+
+      // Push an extra page to the ORIGINAL array — stored snapshot must be unchanged
+      pages.push(makePage({ slug: '/new', title: 'New Page', position: 1 }));
+
+      const fetched = await store.findByToken(r.token);
+      expect(fetched?.pages).toHaveLength(1);
+    });
+
+    it('snapshot immutability — mutating a returned record pages does not change the next findByToken result', async () => {
+      const store = new MemoryShareStore();
+      const pages: SharePageSnapshot[] = [makePage()];
+      const r = await store.create({ siteId: 'site-abc', name: 'snap', pages });
+
+      // Mutate the returned record's pages array
+      r.pages.push(makePage({ slug: '/evil', title: 'Evil', position: 99 }));
+
+      const fetched = await store.findByToken(r.token);
+      expect(fetched?.pages).toHaveLength(1);
+    });
+
+    it('legacy create (transitional) — { artifactId, name } still works; siteId is empty string, pages empty', async () => {
+      const store = new MemoryShareStore();
+      const r = await store.create({ artifactId: 'art-legacy', name: 'legacy share' });
+      expect(r.artifactId).toBe('art-legacy');
+      expect(r.siteId).toBe('');
+      expect(r.pages).toEqual([]);
+      expect(r.token).toMatch(/^[A-Za-z0-9]{16}$/);
+    });
   });
 
   describe('findByToken', () => {
@@ -34,6 +104,16 @@ describe('MemoryShareStore', () => {
       const created = await store.create({ artifactId: 'a1', name: 'n' });
       const found = await store.findByToken(created.token);
       expect(found?.token).toBe(created.token);
+    });
+
+    it('returns pages on site-scoped records', async () => {
+      const store = new MemoryShareStore();
+      const pages = [makePage({ slug: '/', title: 'Home', position: 0 })];
+      const created = await store.create({ siteId: 'site-xyz', name: 'with pages', pages });
+      const found = await store.findByToken(created.token);
+      expect(found?.pages).toHaveLength(1);
+      expect(found?.pages[0]?.slug).toBe('/');
+      expect(found?.siteId).toBe('site-xyz');
     });
   });
 
@@ -55,6 +135,21 @@ describe('MemoryShareStore', () => {
       expect(all[0]!.token).toBe(second.token);
       expect(all[1]!.token).toBe(first.token);
       vi.useRealTimers();
+    });
+
+    it('pages survive list — site-scoped records carry their snapshots', async () => {
+      const store = new MemoryShareStore();
+      const pages = [
+        makePage({ slug: '/', title: 'Home', position: 0 }),
+        makePage({ slug: '/contact', title: 'Contact', artifactId: 'art-003', position: 1 }),
+      ];
+      await store.create({ siteId: 'site-xyz', name: 'listed share', pages });
+      const all = await store.list();
+      expect(all).toHaveLength(1);
+      expect(all[0]!.pages).toHaveLength(2);
+      expect(all[0]!.pages[0]?.slug).toBe('/');
+      expect(all[0]!.pages[1]?.slug).toBe('/contact');
+      expect(all[0]!.siteId).toBe('site-xyz');
     });
   });
 

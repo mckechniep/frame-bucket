@@ -1,4 +1,4 @@
-import type { ShareRecord, ShareStore } from './share-store';
+import type { CreateShareInput, ShareRecord, ShareStore } from './share-store';
 import { generateShareToken } from './token';
 import { supabaseServer } from '@/lib/supabase/client-server';
 
@@ -13,16 +13,20 @@ type ShareRow = {
 };
 
 export class SupabaseShareStore implements ShareStore {
-  async create({ artifactId, name }: { artifactId: string; name: string }): Promise<ShareRecord> {
+  async create(input: CreateShareInput): Promise<ShareRecord> {
     const sb = supabaseServer();
     const token = generateShareToken();
-    // TRANSITIONAL SHIM (M6 Tasks 13-14 replace this): the caller still passes an
-    // artifact ID, which is written into the site_id column. This is type-correct but
-    // semantically wrong — and the FK to sites(id) means any real insert would fail.
-    // Dev uses MemoryShareStore so this path is never exercised before Tasks 13-14 land.
+    // TRANSITIONAL SHIM (M6 Task 14 replaces this with real site-scoped writes):
+    // - New path `{ siteId, name, pages }`: siteId goes into the DB column;
+    //   pages snapshot storage is added in Task 14.
+    // - Legacy path `{ artifactId, name }`: writes an empty string as site_id
+    //   (semantically wrong; the FK to sites(id) means this would fail on real
+    //   data — dev uses MemoryShareStore so this is never exercised).
+    // Task 19 removes the legacy path entirely.
+    const siteId = 'siteId' in input ? input.siteId : '';
     const { data, error } = await sb
       .from('shares')
-      .insert({ token, site_id: artifactId, name })
+      .insert({ token, site_id: siteId, name: input.name })
       .select('*')
       .single();
     if (error) throw new Error(`SupabaseShareStore.create: ${error.message}`);
@@ -148,8 +152,15 @@ export class SupabaseShareStore implements ShareStore {
 }
 
 function rowToRecord(row: ShareRow): ShareRecord {
+  // TRANSITIONAL SHIM (M6 Task 14 replaces this):
+  // - siteId maps from site_id column.
+  // - pages is empty until Task 14 adds the snapshot column and reads it.
+  // - artifactId carries site_id for backward compat with callers that still
+  //   read the deprecated field (Tasks 15-19 migrate them; Task 19 removes it).
   return {
     token: row.token,
+    siteId: row.site_id,
+    pages: [],
     artifactId: row.site_id,
     name: row.name,
     revokedAt: row.revoked_at,
