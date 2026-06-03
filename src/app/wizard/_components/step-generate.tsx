@@ -10,6 +10,7 @@ import { useSharesList } from '../_hooks/use-shares-list';
 import { AddPageModal } from './add-page-modal';
 import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
+import { PagePreviewFrame } from './page-preview-frame';
 import { PageSwitcher } from './page-switcher';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
@@ -209,11 +210,10 @@ export function StepGenerate() {
   const showGeneratingPane = isStreaming;
   const showStoredPreview = !showGeneratingPane && !!previewArtifactId && stream.phase !== 'error';
 
-  // Nav injection in the wizard preview requires fetching raw artifact HTML
-  // client-side (injectNav is pure but needs the HTML string). The wizard
-  // preview currently uses the /preview/<id> route which is a Next.js page,
-  // not raw HTML — srcDoc injection is deferred until a
-  // /api/artifact/[id]/html raw-HTML endpoint is added (future task).
+  // Nav injection in the wizard preview is handled by PagePreviewFrame:
+  // it fetches raw HTML from /api/artifact/[id]/html, injects the current
+  // site nav client-side via srcDoc, and re-injects on store changes without
+  // refetching — closing the M6 wizard-preview nav injection gap.
 
   const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
@@ -284,13 +284,7 @@ export function StepGenerate() {
           ) : null}
 
           {showStoredPreview && !showSideBySide && previewArtifactId ? (
-            <iframe
-              key={previewArtifactId}
-              src={`/preview/${previewArtifactId}`}
-              sandbox="allow-scripts"
-              className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-              title="Generated artifact preview"
-            />
+            <PagePreviewFrame artifactId={previewArtifactId} title="Generated artifact preview" />
           ) : null}
 
           {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}

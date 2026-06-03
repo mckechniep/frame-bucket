@@ -2,6 +2,8 @@
 
 import { useWizardStore, type WizardRound } from '@/lib/wizard/store';
 
+import { PagePreviewFrame } from './page-preview-frame';
+
 function paneLabel(round: WizardRound | undefined): string {
   if (!round) return '';
   if (round.checkpointName) return round.checkpointName;
@@ -64,13 +66,7 @@ function PreviewPane({ artifactId, round, roleLabel, onClose }: PreviewPaneProps
           </button>
         ) : null}
       </header>
-      <iframe
-        key={artifactId}
-        src={`/preview/${artifactId}`}
-        sandbox="allow-scripts"
-        className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-        title={`Preview: ${paneLabel(round)}`}
-      />
+      <PagePreviewFrame artifactId={artifactId} title={`Preview: ${paneLabel(round)}`} />
     </div>
   );
 }
