@@ -16,6 +16,10 @@ export class SupabaseShareStore implements ShareStore {
   async create({ artifactId, name }: { artifactId: string; name: string }): Promise<ShareRecord> {
     const sb = supabaseServer();
     const token = generateShareToken();
+    // TRANSITIONAL SHIM (M6 Tasks 13-14 replace this): the caller still passes an
+    // artifact ID, which is written into the site_id column. This is type-correct but
+    // semantically wrong — and the FK to sites(id) means any real insert would fail.
+    // Dev uses MemoryShareStore so this path is never exercised before Tasks 13-14 land.
     const { data, error } = await sb
       .from('shares')
       .insert({ token, site_id: artifactId, name })

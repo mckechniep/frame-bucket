@@ -48,7 +48,7 @@ describe('SupabaseShareStore', () => {
       const chain = makeChain({
         data: {
           token: 'ABCDEFGHIJKLMNOx',
-          artifact_id: 'art-123',
+          site_id: 'art-123',
           name: 'My Share',
           revoked_at: null,
           last_viewed_at: null,
