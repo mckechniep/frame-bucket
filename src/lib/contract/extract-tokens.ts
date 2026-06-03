@@ -168,6 +168,7 @@ function looksLikeColor(value: string): boolean {
   if (/^hsla?\s*\(/.test(v)) return true;
   if (/^oklch\s*\(/.test(v)) return true;
   if (/^color\s*\(/.test(v)) return true;
+  if (/^color-mix\s*\(/i.test(v)) return true;
   if (CSS_NAMED_COLORS.has(v)) return true;
   return false;
 }
@@ -258,9 +259,14 @@ function parseDeclarations(block: string): RawDeclaration[] {
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
-    // Skip pure comment lines
-    if (line.startsWith('/*') || line === '') {
-      accumulator = '';
+    // Skip blank and pure-comment lines — but only when NOT mid-accumulation.
+    // If we're already building a multi-line value, a comment or blank line is
+    // continuation noise; keep accumulating toward the `;` terminator.
+    if (line === '' || line.startsWith('/*')) {
+      if (accumulator === '') {
+        continue; // nothing started yet — safe to skip
+      }
+      // Mid-declaration: treat as whitespace continuation (don't reset, don't append)
       continue;
     }
 
@@ -397,12 +403,14 @@ function parseGoogleFontsLinks(html: string): GFontEntry[] {
  * Given the set of `--font-*` declarations from :root and a font family name,
  * return the role implied by which variable references that family.
  *
- * Priority: the MOST SPECIFIC role wins.  A font that appears as the first
- * family in `--font-mono` is mono even if it also appears as a fallback in
- * `--font-display`.  Role precedence: mono > display > body > other.
+ * Strategy: scan every `--font-*` declaration for the family name (substring
+ * match on the lowercased value).  Collect all roles where it appears, then
+ * return the highest-priority match: mono > display > body > other.
+ * A font assigned to `--font-mono` is always reported as mono even if it also
+ * appears as a fallback in `--font-display`.
  *
- * "First family" means the font is the first non-generic name in the value,
- * i.e. it's the primary typeface for that role variable.
+ * Note: this does NOT require the family to be the "first" family in the value
+ * — any appearance in the right variable wins at the appropriate priority.
  */
 function inferFontRole(
   family: string,
@@ -516,7 +524,11 @@ export function extractTokens(
           continue;
         }
 
-        // Remainder → other
+        // Remainder → other.
+        // NOTE: --font-* family declarations (e.g. --font-display, --font-mono) intentionally
+        // fall through here. They must live in `other` so tokens.css can reproduce every
+        // :root custom property from colors + typeScale + spacing + other. The structured
+        // `fonts` array is the human-facing view; raw font-family stacks are also in `other`.
         other.push({ name: d.name, value: d.value });
       }
     }
@@ -563,7 +575,12 @@ export function extractTokens(
       other,
       meta: { extractedFrom: extractedFrom ?? 'inline', recipeSummary, fallback: false },
     };
-  } catch {
+  } catch (e) {
+    // Never throw — extraction failures must not break generation/serve paths.
+    // But surface the error in dev/CI so implementation bugs don't hide as "found nothing".
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('[extractTokens] unexpected error — returning empty result', e);
+    }
     return empty();
   }
 }

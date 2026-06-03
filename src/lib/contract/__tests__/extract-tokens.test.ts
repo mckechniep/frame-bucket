@@ -136,6 +136,62 @@ describe('extractTokens — meta', () => {
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
+// other bucket — CSS reproduction guarantee
+// ──────────────────────────────────────────────────────────────────────────────
+describe('extractTokens — other bucket', () => {
+  it('--font-display declaration appears in result.other (CSS reproduction guarantee)', () => {
+    const html = `
+      <html><head><style>
+        :root {
+          --font-display: 'Major Mono Display', monospace;
+          --color-bg: #0a0a0a;
+        }
+      </style></head><body></body></html>
+    `;
+    const result = extractTokens(html, 'test');
+    const fontDecl = result.other.find((o) => o.name === '--font-display');
+    expect(fontDecl).toBeDefined();
+    expect(fontDecl?.value).toContain('Major Mono Display');
+  });
+
+  it('multi-line custom property value is parsed correctly and lands in other', () => {
+    const html = `
+      <html><head><style>
+        :root {
+          --shadow-card: 0 2px 4px rgba(0,0,0,0.1),
+            0 8px 16px rgba(0,0,0,0.2);
+        }
+      </style></head><body></body></html>
+    `;
+    const result = extractTokens(html, 'test');
+    const shadow = result.other.find((o) => o.name === '--shadow-card');
+    expect(shadow).toBeDefined();
+    // Full value should contain both shadow layers
+    expect(shadow?.value).toContain('0 2px 4px');
+    expect(shadow?.value).toContain('0 8px 16px');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// color-mix() classification
+// ──────────────────────────────────────────────────────────────────────────────
+describe('extractTokens — color-mix recognition', () => {
+  it('color-mix() value classifies as a color token', () => {
+    const html = `
+      <html><head><style>
+        :root {
+          --color-overlay: color-mix(in oklch, #000 30%, transparent);
+        }
+      </style></head><body></body></html>
+    `;
+    const result = extractTokens(html, 'test');
+    const overlay = result.colors.find((c) => c.name === '--color-overlay');
+    expect(overlay).toBeDefined();
+    expect(overlay?.value).toContain('color-mix');
+  });
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Edge cases — never throws
 // ──────────────────────────────────────────────────────────────────────────────
 describe('extractTokens — edge cases', () => {
