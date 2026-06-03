@@ -3,8 +3,6 @@ import Link from 'next/link';
 interface ShareFooterProps {
   /** Share token — when present, the contract-download disclosure is rendered. */
   token?: string;
-  /** Current page title — used for the iframe's accessible label. Optional. */
-  pageName?: string;
 }
 
 /**
@@ -22,7 +20,7 @@ interface ShareFooterProps {
  * <summary> element with three download links for the design contract files
  * produced by Task 18's /api/share/<token>/contract route.
  */
-export function ShareFooter({ token, pageName: _pageName }: ShareFooterProps) {
+export function ShareFooter({ token }: ShareFooterProps) {
   return (
     <div className="fixed bottom-3 right-3 z-10 flex flex-col items-end gap-1.5">
       {token && (

@@ -234,6 +234,14 @@ describe('isValidSlug', () => {
     it('handles three segments', () => {
       expect(normalizeSlugParts(['a', 'b', 'c'])).toBe('/a/b/c');
     });
+
+    it('drops empty segments to prevent double-slash URLs', () => {
+      expect(normalizeSlugParts(['', 'about'])).toBe('/about');
+    });
+
+    it('returns "/" when all segments are empty', () => {
+      expect(normalizeSlugParts([''])).toBe('/');
+    });
   });
 
   describe('regex and constants', () => {

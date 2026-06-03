@@ -101,18 +101,19 @@ export default async function SharePage({
   return (
     <main className="relative h-screen w-screen overflow-hidden">
       {/*
-       * Sandbox policy:
-       *   allow-scripts                         — model-generated JS (animations, interactions)
-       *   allow-top-navigation-by-user-activation — lets nav clicks (target=_top, user-activated)
-       *                                            escape the iframe and navigate the parent to
-       *                                            /s/<token>/<slug>. Requires a real user gesture
-       *                                            (pointer/keyboard event) — speculative or
-       *                                            programmatic top-nav is blocked by the browser.
+       * Sandbox: allow-scripts (the artifact's own JS runs) + allow-top-navigation-by-user-activation
+       * (so a recipient CLICK on a rewritten nav link escapes the iframe to /s/<token>/<slug>).
        *
-       * Why this is safe: the iframe content is first-party model-generated HTML served from the
-       * same origin. The require-user-activation constraint prevents script-driven top-nav (which
-       * would allow a rogue script to silently navigate the recipient away), while still permitting
-       * the legitimate multi-page navigation this feature requires.
+       * NOTE on the threat model: this flag does NOT prevent script-mediated top navigation — a
+       * script in the artifact running inside a click handler satisfies the user-activation gate
+       * and could redirect window.top. It only blocks UNSOLICITED programmatic navigation with no
+       * prior user gesture. This is acceptable here because artifacts are model-generated from
+       * operator-controlled prompts, not user-supplied HTML — there is no path for an external
+       * attacker to inject artifact content. If that trust boundary ever widens (e.g. user-submitted
+       * HTML), switch to a postMessage-based nav shell so the iframe never gets top-nav at all.
+       *
+       * (No allow-same-origin: srcDoc iframes get an opaque origin, so framed scripts can never
+       * reach parent cookies/storage/DOM.)
        */}
       <iframe
         title={`${page.title} — ${share.name}`}
@@ -120,7 +121,7 @@ export default async function SharePage({
         sandbox="allow-scripts allow-top-navigation-by-user-activation"
         className="absolute inset-0 h-full w-full border-0 bg-white"
       />
-      <ShareFooter token={token} pageName={page.title} />
+      <ShareFooter token={token} />
     </main>
   );
 }

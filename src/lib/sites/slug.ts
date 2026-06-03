@@ -57,16 +57,24 @@ export function deriveSlug(title: string): string {
 /**
  * Maps Next.js catch-all segments to a page slug.
  *
- *   undefined or [] → '/'  (landing page — no extra path segments)
- *   ['about']       → '/about'
- *   ['team','bios'] → '/team/bios'
+ *   undefined or []        → '/'       (landing page — no extra path segments)
+ *   ['about']              → '/about'
+ *   ['team','bios']        → '/team/bios'
+ *   ['', 'about']          → '/about'  (empty segments are silently dropped)
+ *   ['']                   → '/'       (only empty segments → root)
+ *
+ * Empty segments are filtered out before joining to prevent double-slash URLs
+ * that would never match a stored page slug (e.g. `['', 'about']` must not
+ * produce `'//about'`).
  *
  * Called by the [[...slug]] share viewer to convert Next's segment array into
  * the canonical slug stored in share.pages[].slug. Pure; never throws.
  */
 export function normalizeSlugParts(parts: string[] | undefined): string {
   if (!parts || parts.length === 0) return '/';
-  return '/' + parts.join('/');
+  const clean = parts.filter((p) => p.length > 0);
+  if (clean.length === 0) return '/';
+  return '/' + clean.join('/');
 }
 
 /**
