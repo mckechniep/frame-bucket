@@ -36,9 +36,28 @@ const COOKIE_NAME = 'fb_admin';
 const PUBLIC_PREFIXES = ['/s/', '/admin', '/_next/'];
 const PUBLIC_EXACT = new Set(['/', '/favicon.ico', '/robots.txt', '/sitemap.xml']);
 
+/**
+ * Precise carve-out for the recipient contract download route (Rule 4 / M6 Task 18).
+ *
+ * /api/share/[token]/contract is PUBLIC so share recipients (who have no admin
+ * cookie) can download the design contract files. All other /api/share/* paths
+ * remain gated:
+ *   - /api/share              (list all shares — operator only)
+ *   - /api/share/[token]      (rename / revoke — operator only)
+ *   - /api/share/[token]/*    (any other sub-path — not currently defined, but gated)
+ *
+ * The regex is INTENTIONALLY permissive on the token character set (any
+ * alphanumeric run). The route's own isValidToken() (Rule 4) is the real
+ * validation gate — it rejects malformed tokens before any DB contact.
+ */
+const SHARE_CONTRACT_RE = /^\/api\/share\/[A-Za-z0-9]+\/contract$/;
+
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.has(pathname)) return true;
-  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return true;
+  // Recipient contract download — carved out precisely so list/rename/revoke stay gated.
+  if (SHARE_CONTRACT_RE.test(pathname)) return true;
+  return false;
 }
 
 function addShareHeaders(pathname: string, res: NextResponse): NextResponse {
