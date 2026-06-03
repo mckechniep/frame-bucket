@@ -4,6 +4,7 @@ import { getAnthropicClient } from '@/lib/anthropic/client';
 import { defaultArchiveStore } from '@/lib/generation/archive';
 import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
+import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 import type { Recipe } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -105,8 +106,23 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         });
 
+        // Create the site and its landing page now that the artifact exists.
+        // This must happen AFTER archive.save so the FK reference is valid.
+        // It sits inside the same try block, after the AbortError guard, so
+        // an aborted generation (client disconnect) skips BOTH save and site
+        // creation — Rule 9: no orphan sites on abort.
+        const siteStore = defaultSiteStore();
+        const site = await siteStore.createSite({ name: recipe.brief.projectName });
+        await siteStore.addPage(site.id, {
+          slug: '/',
+          title: 'Home',
+          artifactId: archiveId,
+          position: 0,
+        });
+
         send('done', {
           artifactId: archiveId,
+          siteId: site.id,
           usage,
           cost,
           imagesInjected: placeholderCount,
