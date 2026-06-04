@@ -10,13 +10,21 @@ import { useGenerationStream } from '../_hooks/use-generation-stream';
 const MIN_BRIEF_LENGTH = 10;
 const MAX_BRIEF_LENGTH = 2000;
 
+/** Generation metadata for the round the new subpage establishes. The cost is
+ *  computed + billed server-side; recording it here is what lets the wizard's
+ *  cost UI (History panel) reflect subpage generations. */
+export interface AddPageSuccessMeta {
+  cost: number;
+  generatedAt: string;
+}
+
 interface AddPageModalProps {
   open: boolean;
   onClose: () => void;
   siteId: string;
   existingSlugs: string[];
   nextPosition: number;
-  onSuccess: (page: WizardPage) => void;
+  onSuccess: (page: WizardPage, meta: AddPageSuccessMeta) => void;
 }
 
 // Outer gate: ensures the inner component mounts exactly once per open cycle.
@@ -115,15 +123,20 @@ function AddPageModalInner({
   useEffect(() => {
     if (!isDone || !stream.artifactId || !submitContextRef.current) return;
     const { slug: submittedSlug, title: submittedTitle } = submitContextRef.current;
-    onSuccess({
-      slug: submittedSlug,
-      title: submittedTitle,
-      artifactId: stream.artifactId,
-      position: nextPosition,
-    });
+    onSuccess(
+      {
+        slug: submittedSlug,
+        title: submittedTitle,
+        artifactId: stream.artifactId,
+        position: nextPosition,
+      },
+      // The subpage is the root ("Original") round of its own per-page chain;
+      // pass its real cost so the wizard records it instead of dropping it.
+      { cost: stream.cost ?? 0, generatedAt: new Date().toISOString() },
+    );
     onClose();
     submitContextRef.current = null;
-  }, [isDone, stream.artifactId, nextPosition, onSuccess, onClose]);
+  }, [isDone, stream.artifactId, stream.cost, nextPosition, onSuccess, onClose]);
 
   // Slug validation — distinguish syntax failures from reserved-path failures
   // so the error message accurately reflects which check failed.

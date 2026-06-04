@@ -92,12 +92,10 @@ describe('AddPageModal — generated-page result delivery', () => {
     fillAndSubmit();
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
-    expect(onSuccess).toHaveBeenCalledWith({
-      slug: '/about',
-      title: 'About',
-      artifactId: 'art-about-123',
-      position: 1,
-    });
+    expect(onSuccess).toHaveBeenCalledWith(
+      { slug: '/about', title: 'About', artifactId: 'art-about-123', position: 1 },
+      { cost: 0.12, generatedAt: expect.any(String) },
+    );
     expect(onClose).toHaveBeenCalled();
   });
 

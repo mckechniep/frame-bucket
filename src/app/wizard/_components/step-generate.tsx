@@ -163,7 +163,13 @@ export function StepGenerate() {
   const handleRefine = useCallback(
     (feedback: string) => {
       if (!selectedRecipe) return;
-      const latest = rounds[rounds.length - 1];
+      // Iterate the page the operator is currently viewing: parent off the
+      // active page's current round, not the globally last round. Now that
+      // subpages are rounds too, `rounds[last]` could belong to a different
+      // page (e.g. the most recently added one), which would refine the wrong
+      // artifact and advance the wrong page pointer.
+      const latest =
+        rounds.find((r) => r.artifactId === activeArtifactId) ?? rounds[rounds.length - 1];
       if (!latest) return;
       if (latest.iterationRound >= MAX_ROUNDS) return;
 
@@ -193,7 +199,7 @@ export function StepGenerate() {
         },
       });
     },
-    [selectedRecipe, rounds, siteId, activeSlug],
+    [selectedRecipe, rounds, siteId, activeSlug, activeArtifactId],
   );
 
   const handleSwitch = useCallback(
@@ -341,8 +347,20 @@ export function StepGenerate() {
         siteId={siteId ?? ''}
         existingSlugs={pages.map((p) => p.slug)}
         nextPosition={pages.length === 0 ? 0 : Math.max(...pages.map((p) => p.position)) + 1}
-        onSuccess={(page) => {
+        onSuccess={(page, meta) => {
           addPage(page);
+          // Record the subpage as the "Original" (root) round of its own
+          // per-page iteration chain, carrying its real generation cost — so
+          // the History panel shows it and per-page refine can parent off it,
+          // exactly like the landing page's round.
+          appendRound({
+            artifactId: page.artifactId,
+            parentArtifactId: null,
+            iterationRound: 0,
+            recipeSummary: page.title,
+            cost: meta.cost,
+            generatedAt: meta.generatedAt,
+          });
           setActiveSlug(page.slug);
           setActiveArtifactId(page.artifactId);
           // A freshly added page must show even if a prior generate/refine
