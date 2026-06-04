@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { AdminLogin } from './login';
+import { AdminModelSettingsPanel } from './model-settings-panel';
 import { AdminSyncPanel } from './sync-panel';
 
 export default async function AdminPage() {
@@ -16,9 +17,15 @@ export default async function AdminPage() {
   }
 
   return (
-    <main className="p-8">
-      <h2 className="text-[var(--text-xl)] mb-4">Taxonomy sync</h2>
-      <AdminSyncPanel adminToken={token} />
+    <main className="p-8 space-y-10">
+      <section>
+        <h2 className="text-[var(--text-xl)] mb-4">Taxonomy sync</h2>
+        <AdminSyncPanel adminToken={token} />
+      </section>
+      <section>
+        <h2 className="text-[var(--text-xl)] mb-4">Model settings</h2>
+        <AdminModelSettingsPanel adminToken={token} />
+      </section>
     </main>
   );
 }

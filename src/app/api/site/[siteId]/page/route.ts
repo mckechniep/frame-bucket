@@ -11,6 +11,8 @@ import type { NavPage } from '@/lib/sites/nav-injector';
 import { deriveContract } from '@/lib/contract/derive';
 import { assembleSubpageRequest } from '@/lib/prompts/subpage-assembler';
 import type { AnthropicRequest } from '@/lib/prompts/assembler';
+import { defaultSettingsStore } from '@/lib/settings/store';
+import { applyModelConfig, DEFAULT_MODEL_SETTINGS } from '@/lib/settings/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -75,6 +77,7 @@ async function runStream(
       max_tokens: request.max_tokens,
       system: request.system,
       messages: request.messages,
+      ...(request.thinking ? { thinking: request.thinking } : {}),
     },
     { signal },
   );
@@ -184,7 +187,7 @@ export async function POST(
 
   // ── 10. Assemble the Anthropic request ────────────────────────────────────
   // landingStructure = raw HTML; assembleSubpageRequest calls outlineHtml() internally.
-  const request = await assembleSubpageRequest({
+  const assembled = await assembleSubpageRequest({
     contractMd: contract.contractMd,
     pageBrief: brief,
     pageTitle: title,
@@ -192,6 +195,11 @@ export async function POST(
     navManifest,
     landingStructure: landingHtml,
   });
+
+  // Apply operator-configured model + effort (from /admin); defaults preserve
+  // the built-in behavior when nothing has been saved.
+  const settings = (await defaultSettingsStore().get()) ?? DEFAULT_MODEL_SETTINGS;
+  const request = applyModelConfig(assembled, settings.subpage);
 
   const client = getAnthropicClient();
 

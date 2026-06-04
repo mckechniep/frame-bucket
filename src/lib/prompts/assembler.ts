@@ -1,4 +1,5 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
+import type { ThinkingConfig } from '@/lib/settings/constants';
 import { loadCanonLayers, formatInvariantBlock } from './canon-layers';
 import { formatBrief } from './format-brief';
 
@@ -14,6 +15,8 @@ export interface AnthropicRequest {
   system: SystemBlock[];
   messages: Array<{ role: 'user'; content: string }>;
   stream: boolean;
+  /** Set by applyModelConfig when an effort level enables extended thinking. */
+  thinking?: ThinkingConfig;
 }
 
 function formatEntry(e: TaxonomyEntry): string {

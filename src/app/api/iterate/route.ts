@@ -7,6 +7,8 @@ import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-im
 import { estimateCost } from '@/lib/cost';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 import { logger } from '@/lib/logger';
+import { defaultSettingsStore } from '@/lib/settings/store';
+import { applyModelConfig, DEFAULT_MODEL_SETTINGS } from '@/lib/settings/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -96,6 +98,11 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'server prompt config missing', detail }, { status: 500 });
   }
 
+  // Apply operator-configured model + effort (from /admin); defaults preserve
+  // the built-in behavior when nothing has been saved.
+  const settings = (await defaultSettingsStore().get()) ?? DEFAULT_MODEL_SETTINGS;
+  anthropicRequest = applyModelConfig(anthropicRequest, settings.iterate);
+
   const client = getAnthropicClient();
 
   // -------------------------------------------------------------------------
@@ -126,6 +133,7 @@ export async function POST(req: NextRequest) {
             max_tokens: anthropicRequest.max_tokens,
             system: anthropicRequest.system,
             messages: anthropicRequest.messages,
+            ...(anthropicRequest.thinking ? { thinking: anthropicRequest.thinking } : {}),
           },
           { signal: req.signal },
         );

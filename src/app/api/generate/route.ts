@@ -6,6 +6,8 @@ import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-im
 import { estimateCost } from '@/lib/cost';
 import { defaultSiteStore } from '@/lib/sites/site-store-factory';
 import { RecipeSchema } from '@/lib/schemas';
+import { defaultSettingsStore } from '@/lib/settings/store';
+import { applyModelConfig, DEFAULT_MODEL_SETTINGS } from '@/lib/settings/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -33,7 +35,10 @@ export async function POST(req: NextRequest) {
   }
   const recipe = parsed.data;
 
-  const request = await assembleGenerationRequest(recipe);
+  // Apply operator-configured model + effort (from /admin); defaults preserve
+  // the built-in behavior when nothing has been saved.
+  const settings = (await defaultSettingsStore().get()) ?? DEFAULT_MODEL_SETTINGS;
+  const request = applyModelConfig(await assembleGenerationRequest(recipe), settings.generate);
   const client = getAnthropicClient();
 
   const stream = new ReadableStream({
@@ -62,6 +67,7 @@ export async function POST(req: NextRequest) {
             max_tokens: request.max_tokens,
             system: request.system,
             messages: request.messages,
+            ...(request.thinking ? { thinking: request.thinking } : {}),
           },
           { signal: req.signal },
         );
