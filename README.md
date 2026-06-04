@@ -82,13 +82,24 @@ reasons over.
 
 | Stage                        | Model                                            | Mode          | Why                                                                                                         |
 | ---------------------------- | ------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------- |
+| Stage                        | Default model                                    | Mode          | Why                                                                                                         |
+| ---------------------------- | ------------------------------------------------ | ------------- | ----------------------------------------------------------------------------------------------------------- |
 | Recommend                    | **Claude Haiku 4.5** (`claude-haiku-4-5`)        | Non-streaming | Selection from a fixed catalog is cheap; small model is fast and sufficient                                 |
 | Generate / Iterate / Subpage | **Claude Opus 4.7** (`claude-opus-4-7`)          | SSE streaming | Producing a full, canon-compliant HTML page is the hard part; use the frontier model                        |
 | Image fill                   | **OpenRouter → `google/gemini-2.5-flash-image`** | Post-process  | Generated HTML emits `OPENROUTER:` placeholders; these are filled into real `<img>` assets after generation |
 | Contract narrative           | **Claude Haiku 4.5**                             | Single call   | One capped (~$0.01) call to enrich the extracted design contract                                            |
 
+The model **and an effort level** for each Anthropic stage (recommend / generate
+/ iterate / add-page) are **operator-configurable at runtime** from the
+**Model settings** panel in `/admin` — pick from a curated list (Opus 4.8/4.7/4.5,
+Sonnet 4.6/4.5, Haiku 4.5). "Effort" maps to Anthropic **extended thinking**
+(off / low / medium / high → a thinking-token budget); higher effort trades cost
+and latency for deeper reasoning. The values above are the defaults used until an
+operator changes them.
+
 Token usage and **cost are tracked on every call** (`src/lib/cost.ts`) and
-surfaced in the wizard's history panel.
+surfaced in the wizard's history panel (thinking tokens bill as output, so they
+are captured automatically).
 
 ---
 
