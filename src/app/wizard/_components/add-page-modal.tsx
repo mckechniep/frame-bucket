@@ -100,6 +100,13 @@ function AddPageModalInner({
   const isDone = stream.phase === 'done';
   const isError = stream.phase === 'error';
 
+  // The subpage route does real work (contract derivation, prompt assembly)
+  // before it returns the streaming Response, so `phase` stays 'idle' for a
+  // beat after submit even though a request is in flight. Treat that window as
+  // "preparing" so the modal gives immediate feedback instead of looking dead.
+  const isPreparing = runKey !== '' && stream.phase === 'idle';
+  const isBusy = isPreparing || isStreaming;
+
   // On stream completion, call onSuccess and close.
   // slug/title are read from the ref (captured at submit time) so this effect
   // can include all its real deps without stale-closure risk. The ref-null
@@ -146,7 +153,7 @@ function AddPageModalInner({
     !slugIsDuplicate &&
     brief.trim().length >= MIN_BRIEF_LENGTH &&
     !briefTooLong &&
-    !isStreaming;
+    !isBusy;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -190,7 +197,7 @@ function AddPageModalInner({
             autoFocus
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
-            disabled={isStreaming}
+            disabled={isBusy}
             placeholder="e.g. About, Services, Contact"
             className="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--text-base)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-ring)] disabled:opacity-60"
           />
@@ -205,7 +212,7 @@ function AddPageModalInner({
             type="text"
             value={slug}
             onChange={(e) => handleSlugChange(e.target.value)}
-            disabled={isStreaming}
+            disabled={isBusy}
             placeholder="/about"
             className={[
               'w-full rounded-[var(--radius-md)] border bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] font-[family-name:var(--font-mono)] text-[var(--text-base)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:outline-none focus:ring-2 disabled:opacity-60',
@@ -232,7 +239,7 @@ function AddPageModalInner({
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
-            disabled={isStreaming}
+            disabled={isBusy}
             placeholder="Describe the content and purpose of this page…"
             rows={4}
             className="w-full resize-y rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-[var(--space-4)] py-[var(--space-3)] text-[var(--text-base)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-ring)] disabled:opacity-60"
@@ -251,16 +258,18 @@ function AddPageModalInner({
         </label>
 
         {/* Streaming status */}
-        {isStreaming ? (
+        {isBusy ? (
           <div className="flex items-center gap-[var(--space-3)]">
             <span
               aria-hidden
               className="block h-[6px] w-[6px] animate-pulse rounded-full bg-[var(--color-accent)]"
             />
             <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
-              {stream.phase === 'images'
-                ? `Adding images (${stream.imageCount})…`
-                : 'Generating page…'}
+              {isPreparing
+                ? 'Preparing…'
+                : stream.phase === 'images'
+                  ? `Adding images (${stream.imageCount})…`
+                  : 'Generating page…'}
             </p>
           </div>
         ) : null}
@@ -272,7 +281,7 @@ function AddPageModalInner({
           <button
             type="button"
             onClick={onClose}
-            disabled={isStreaming}
+            disabled={isBusy}
             className="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-colors duration-[var(--duration-fast)] hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:opacity-60"
           >
             Cancel
@@ -282,7 +291,7 @@ function AddPageModalInner({
             disabled={!canSubmit}
             className="rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-2)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isStreaming ? 'Generating…' : 'Generate page'}
+            {isBusy ? 'Generating…' : 'Generate page'}
           </button>
         </footer>
       </form>

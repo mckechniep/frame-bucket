@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useWizardStore } from '@/lib/wizard/store';
+
+import { useWizardHydrated } from '../_hooks/use-wizard-hydrated';
 
 /**
  * Two responsibilities, both client-only:
@@ -20,16 +22,8 @@ import { useWizardStore } from '@/lib/wizard/store';
  *    small notice for ~8s.
  */
 
-function useStoreHydrated(): boolean {
-  return useSyncExternalStore(
-    (callback) => useWizardStore.persist.onFinishHydration(callback),
-    () => useWizardStore.persist.hasHydrated(),
-    () => false,
-  );
-}
-
 export function WizardHydrator() {
-  const hydrated = useStoreHydrated();
+  const hydrated = useWizardHydrated();
   const [droppedCount, setDroppedCount] = useState(0);
   // Guard against double-invocation under StrictMode dev double-mount. The
   // /api/artifact/exists call is cheap (a few fs.stat calls) so a double-fire

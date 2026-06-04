@@ -56,6 +56,14 @@ export function StepGenerate() {
 
   const [addPageOpen, setAddPageOpen] = useState(false);
 
+  // The preview gate below keys off the *main* generation stream's phase. When
+  // that stream is in 'error' (a failed generate/refine), it must not blank the
+  // canvas for an artifact the user has since chosen via page-switch or a
+  // successful add-page (those run a *different* stream). This flag lets such a
+  // navigation supersede the stale error; a fresh refine resets it so the new
+  // attempt's own error can surface again.
+  const [staleErrorDismissed, setStaleErrorDismissed] = useState(false);
+
   const hasExistingRound = rounds.length > 0;
 
   const recipeKey = useMemo(
@@ -159,6 +167,9 @@ export function StepGenerate() {
       if (!latest) return;
       if (latest.iterationRound >= MAX_ROUNDS) return;
 
+      // New attempt: let its own outcome (including an error) drive the canvas.
+      setStaleErrorDismissed(false);
+
       // Parent metadata is captured here at submit time and threaded to the
       // done-effect via the ref. Each iteration overwrites the ref; the
       // done-effect clears it once the round is appended.
@@ -191,6 +202,8 @@ export function StepGenerate() {
       if (!page) return;
       setActiveSlug(slug);
       setActiveArtifactId(page.artifactId);
+      // Viewing a chosen page supersedes any stale main-stream error.
+      setStaleErrorDismissed(true);
     },
     [pages, setActiveSlug, setActiveArtifactId],
   );
@@ -208,7 +221,8 @@ export function StepGenerate() {
   // The finished preview lands on `done` via the stable /preview/<id> route.
   const previewArtifactId = activeArtifactId ?? latestRound?.artifactId ?? null;
   const showGeneratingPane = isStreaming;
-  const showStoredPreview = !showGeneratingPane && !!previewArtifactId && stream.phase !== 'error';
+  const showStoredPreview =
+    !showGeneratingPane && !!previewArtifactId && (stream.phase !== 'error' || staleErrorDismissed);
 
   // Nav injection in the wizard preview is handled by PagePreviewFrame:
   // it fetches raw HTML from /api/artifact/[id]/html, injects the current
@@ -331,6 +345,9 @@ export function StepGenerate() {
           addPage(page);
           setActiveSlug(page.slug);
           setActiveArtifactId(page.artifactId);
+          // A freshly added page must show even if a prior generate/refine
+          // left the main stream in an error phase.
+          setStaleErrorDismissed(true);
         }}
       />
     </section>

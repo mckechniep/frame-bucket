@@ -6,6 +6,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { canEnterStep, STEPS, stepPath, type Step } from '@/lib/wizard/steps';
 import { useWizardStore } from '@/lib/wizard/store';
 
+import { useWizardHydrated } from '../_hooks/use-wizard-hydrated';
+
 const STEP_LABELS: Record<Step, string> = {
   brief: 'Brief',
   recommend: 'Recommendations',
@@ -29,9 +31,21 @@ export function WizardProgressBar() {
   // fresh object literal from a selector triggers an infinite-loop warning
   // from useSyncExternalStore on every render. Selecting each slot separately
   // keeps the references stable.
-  const brief = useWizardStore((s) => s.brief);
-  const recommendation = useWizardStore((s) => s.recommendation);
-  const selectedRecipe = useWizardStore((s) => s.selectedRecipe);
+  const briefRaw = useWizardStore((s) => s.brief);
+  const recommendationRaw = useWizardStore((s) => s.recommendation);
+  const selectedRecipeRaw = useWizardStore((s) => s.selectedRecipe);
+
+  // Step reachability is derived from persisted store state. With
+  // `skipHydration`, SSR and the first client render see the empty initial
+  // state, but the store fills in once `WizardHydrator` rehydrates — which
+  // would flip `disabled`/class attributes and trip a hydration mismatch.
+  // Gate the prereq values on `hydrated` so the first client render mirrors
+  // the server (all null), then re-renders with the real values after
+  // rehydration completes.
+  const hydrated = useWizardHydrated();
+  const brief = hydrated ? briefRaw : null;
+  const recommendation = hydrated ? recommendationRaw : null;
+  const selectedRecipe = hydrated ? selectedRecipeRaw : null;
 
   function handleStepClick(step: Step) {
     if (!canEnterStep(step, { brief, recommendation, selectedRecipe })) return;
