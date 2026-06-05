@@ -5,6 +5,8 @@ import { assembleRecommendationRequest } from '@/lib/prompts/recommendation-asse
 import { getAnthropicClient } from '@/lib/anthropic/client';
 import { parseRecommendationResponse, RecommendationParseError } from '@/lib/recommendation/parse';
 import { estimateCost } from '@/lib/cost';
+import { defaultSettingsStore } from '@/lib/settings/store';
+import { applyModelConfig, DEFAULT_MODEL_SETTINGS } from '@/lib/settings/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -49,6 +51,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 4b. Apply operator-configured model + effort (from /admin), falling back to
+  //     the built-in defaults when nothing has been saved.
+  const settings = (await defaultSettingsStore().get()) ?? DEFAULT_MODEL_SETTINGS;
+  request = applyModelConfig(request, settings.recommend);
+
   // 5. Call Anthropic (non-streaming — recommendation output is small enough
   //    that streaming adds complexity without UX benefit)
   const client = getAnthropicClient();
@@ -60,6 +67,7 @@ export async function POST(req: NextRequest) {
         max_tokens: request.max_tokens,
         system: request.system,
         messages: request.messages,
+        ...(request.thinking ? { thinking: request.thinking } : {}),
       },
       { signal: req.signal },
     );

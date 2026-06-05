@@ -6,6 +6,7 @@ import { Link2 } from 'lucide-react';
 
 import type { ShareRecord } from '@/lib/shares/share-store';
 import { useWizardStore, type WizardRound } from '@/lib/wizard/store';
+import { roundsForPage } from '@/lib/wizard/rounds';
 
 import { CheckpointNameModal } from './checkpoint-name-modal';
 
@@ -32,6 +33,7 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
   const rounds = useWizardStore((s) => s.rounds);
   const activeArtifactId = useWizardStore((s) => s.activeArtifactId);
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
+  const siteId = useWizardStore((s) => s.siteId);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
   const setCompareWithArtifactId = useWizardStore((s) => s.setCompareWithArtifactId);
 
@@ -43,9 +45,21 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
   // matches step-generate's preview-pane fallback logic.
   const effectiveActiveId = activeArtifactId ?? rounds[rounds.length - 1]!.artifactId;
 
+  // For multi-page sites, filter to the active page's iteration chain only.
+  // roundsForPage walks UP from the active artifact via parentArtifactId links
+  // to the root, then returns that chain sorted by iterationRound asc.
+  // For a single-page site this returns the same full chain as before (no regression).
+  const pageRounds = roundsForPage(rounds, effectiveActiveId);
+
   const namingRound = namingArtifactId
     ? (rounds.find((r) => r.artifactId === namingArtifactId) ?? null)
     : null;
+
+  // Shares are site-scoped (M6): the indicator is site-level, not per-round —
+  // all rounds show it when any active (non-revoked) share exists for this site.
+  // Hoisted outside the map so the check runs once, not once per round.
+  const siteHasActiveShare =
+    siteId !== null && shares.some((s) => s.siteId === siteId && !s.revokedAt);
 
   return (
     <aside
@@ -57,17 +71,14 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
           History
         </h2>
         <span className="font-[family-name:var(--font-mono)] text-[var(--text-base)] tabular-nums text-[var(--color-ink-muted)]">
-          {rounds.length}
+          {pageRounds.length}
         </span>
       </header>
 
       <ol className="flex flex-col gap-[var(--space-2)]">
-        {rounds.map((round) => {
+        {pageRounds.map((round) => {
           const isActive = round.artifactId === effectiveActiveId;
           const isComparing = compareWithArtifactId === round.artifactId;
-          const hasActiveShare = shares.some(
-            (s) => s.artifactId === round.artifactId && !s.revokedAt,
-          );
           return (
             <li
               key={round.artifactId}
@@ -109,7 +120,7 @@ export function IterationHistory({ shares = [] }: IterationHistoryProps) {
               </button>
 
               <div className="flex items-center gap-[var(--space-3)] border-t border-[var(--color-border)] px-[var(--space-4)] py-[var(--space-2)]">
-                {hasActiveShare ? (
+                {siteHasActiveShare ? (
                   <Link
                     href="/shares"
                     title="Has active share(s) — view on /shares"

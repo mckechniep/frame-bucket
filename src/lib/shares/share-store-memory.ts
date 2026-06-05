@@ -1,4 +1,4 @@
-import type { ShareRecord, ShareStore } from './share-store';
+import type { CreateShareInput, SharePageSnapshot, ShareRecord, ShareStore } from './share-store';
 import { generateShareToken } from './token';
 
 interface MemoryRow extends ShareRecord {
@@ -7,16 +7,32 @@ interface MemoryRow extends ShareRecord {
   viewBuckets: Set<number>;
 }
 
+/** Returns a deep copy of a pages snapshot array. */
+function clonePages(pages: SharePageSnapshot[]): SharePageSnapshot[] {
+  return pages.map((p) => ({ ...p }));
+}
+
 export class MemoryShareStore implements ShareStore {
   private rows = new Map<string, MemoryRow>();
 
-  async create({ artifactId, name }: { artifactId: string; name: string }): Promise<ShareRecord> {
+  async create(input: CreateShareInput): Promise<ShareRecord> {
     const token = generateShareToken();
     const now = new Date().toISOString();
+
+    // Fail fast: site-scoped shares must have at least one page.
+    if (input.pages.length === 0) {
+      throw new Error('MemoryShareStore.create: pages must not be empty for site-scoped shares');
+    }
+
+    // Deep-copy the caller's pages array so mutations to the original after
+    // create cannot change the stored snapshot.
+    const pages = clonePages(input.pages);
+
     const row: MemoryRow = {
       token,
-      artifactId,
-      name,
+      siteId: input.siteId,
+      pages,
+      name: input.name,
       revokedAt: null,
       lastViewedAt: null,
       viewCount: 0,
@@ -66,8 +82,13 @@ export class MemoryShareStore implements ShareStore {
 }
 
 function rowToRecord(row: MemoryRow): ShareRecord {
-  // Strip the internal viewBuckets Set before returning
+  // Strip the internal viewBuckets Set before returning.
+  // Deep-copy pages so callers cannot mutate internal snapshot state.
+  // Sort by position ascending to match SupabaseShareStore's ORDER BY position ASC.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { viewBuckets, ...record } = row;
-  return record;
+  const { viewBuckets, pages, ...rest } = row;
+  return {
+    ...rest,
+    pages: clonePages(pages).sort((a, b) => a.position - b.position),
+  };
 }

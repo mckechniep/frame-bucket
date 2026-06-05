@@ -5,14 +5,15 @@ import { ShareRow } from './share-row';
 
 interface SharesTableProps {
   shares: ShareRecord[];
+  siteNames: Record<string, string>;
 }
 
-export function SharesTable({ shares }: SharesTableProps) {
+export function SharesTable({ shares, siteNames }: SharesTableProps) {
   if (shares.length === 0) {
     return <EmptyState />;
   }
 
-  // Active first, revoked at the bottom — per Task 17 plan. The API already
+  // Active first, revoked at the bottom -- per Task 17 plan. The API already
   // returns newest-first, so we preserve that order within each group.
   const active = shares.filter((s) => !s.revokedAt);
   const revoked = shares.filter((s) => s.revokedAt);
@@ -20,7 +21,7 @@ export function SharesTable({ shares }: SharesTableProps) {
   return (
     <div className="flex flex-col gap-[var(--space-8)]">
       {active.length > 0 ? (
-        <ShareSection label="Active" count={active.length} shares={active} />
+        <ShareSection label="Active" count={active.length} shares={active} siteNames={siteNames} />
       ) : (
         <p className="text-[var(--text-base)] text-[var(--color-ink-muted)]">
           No active share links. Revoked links are below.
@@ -28,7 +29,13 @@ export function SharesTable({ shares }: SharesTableProps) {
       )}
 
       {revoked.length > 0 ? (
-        <ShareSection label="Revoked" count={revoked.length} shares={revoked} muted />
+        <ShareSection
+          label="Revoked"
+          count={revoked.length}
+          shares={revoked}
+          siteNames={siteNames}
+          muted
+        />
       ) : null}
     </div>
   );
@@ -38,10 +45,11 @@ interface ShareSectionProps {
   label: string;
   count: number;
   shares: ShareRecord[];
+  siteNames: Record<string, string>;
   muted?: boolean;
 }
 
-function ShareSection({ label, count, shares, muted }: ShareSectionProps) {
+function ShareSection({ label, count, shares, siteNames, muted }: ShareSectionProps) {
   return (
     <section
       aria-label={`${label} shares`}
@@ -58,7 +66,11 @@ function ShareSection({ label, count, shares, muted }: ShareSectionProps) {
 
       <ul className="flex flex-col gap-[var(--space-2)]">
         {shares.map((share) => (
-          <ShareRow key={share.token} share={share} />
+          <ShareRow
+            key={share.token}
+            share={share}
+            siteName={siteNames[share.siteId] ?? `Site ...${share.siteId.slice(-6)}`}
+          />
         ))}
       </ul>
     </section>
@@ -78,8 +90,7 @@ function EmptyState() {
         No share links yet.
       </p>
       <p className="max-w-[60ch] text-[var(--text-base)] leading-relaxed text-[var(--color-ink-muted)]">
-        Generate an artifact in the wizard, then look for the “Create share link” button on the
-        Finish panel. Links you create will appear here.
+        Create one from the Finish panel after generating a site.
       </p>
     </section>
   );

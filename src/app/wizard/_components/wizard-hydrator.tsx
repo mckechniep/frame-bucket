@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useWizardStore } from '@/lib/wizard/store';
+
+import { useWizardHydrated } from '../_hooks/use-wizard-hydrated';
 
 /**
  * Two responsibilities, both client-only:
@@ -20,16 +22,8 @@ import { useWizardStore } from '@/lib/wizard/store';
  *    small notice for ~8s.
  */
 
-function useStoreHydrated(): boolean {
-  return useSyncExternalStore(
-    (callback) => useWizardStore.persist.onFinishHydration(callback),
-    () => useWizardStore.persist.hasHydrated(),
-    () => false,
-  );
-}
-
 export function WizardHydrator() {
-  const hydrated = useStoreHydrated();
+  const hydrated = useWizardHydrated();
   const [droppedCount, setDroppedCount] = useState(0);
   // Guard against double-invocation under StrictMode dev double-mount. The
   // /api/artifact/exists call is cheap (a few fs.stat calls) so a double-fire
@@ -51,7 +45,9 @@ export function WizardHydrator() {
     if (hasRunRef.current) return;
     hasRunRef.current = true;
 
-    const initialIds = useWizardStore.getState().rounds.map((r) => r.artifactId);
+    const roundIds = useWizardStore.getState().rounds.map((r) => r.artifactId);
+    const pageIds = useWizardStore.getState().pages.map((p) => p.artifactId);
+    const initialIds = [...new Set([...roundIds, ...pageIds])];
     if (initialIds.length === 0) return;
 
     const abort = new AbortController();

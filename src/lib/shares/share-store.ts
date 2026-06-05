@@ -1,20 +1,42 @@
 /**
- * Domain representation of a share. Mirrors the `shares` table from M5
- * migration 20260516000000 but is the canonical shape every store
- * implementation returns.
+ * A snapshot of one page within a site at the moment the share was created.
+ * The snapshot pins the page state so recipients see exactly what was shared —
+ * later edits to the site require a new share.
+ */
+export interface SharePageSnapshot {
+  slug: string;
+  title: string;
+  artifactId: string;
+  position: number;
+}
+
+/**
+ * Domain representation of a share. Mirrors the `shares` table from M6
+ * migration but is the canonical shape every store implementation returns.
  *
  * ISO 8601 strings (not Date objects) for timestamps — serializes cleanly
  * across the API boundary and Postgres returns them as strings by default.
  */
 export interface ShareRecord {
   token: string;
-  artifactId: string;
+  /** The site this share points at. */
+  siteId: string;
+  /** Snapshot of the site's pages at the time the share was created. */
+  pages: SharePageSnapshot[];
   name: string;
   revokedAt: string | null;
   lastViewedAt: string | null;
   viewCount: number;
   createdAt: string;
 }
+
+/**
+ * Input for creating a new share.
+ *
+ * Pins a snapshot of the site's current page manifest so recipients see
+ * exactly what was shared — later edits to the site require a new share.
+ */
+export type CreateShareInput = { siteId: string; name: string; pages: SharePageSnapshot[] };
 
 /**
  * Contract for storing and querying share metadata. Two implementations:
@@ -24,8 +46,13 @@ export interface ShareRecord {
  * Selected at runtime by the factory in ./share-store-factory.ts (Task 10).
  */
 export interface ShareStore {
-  /** Creates a new share with a fresh unguessable token. */
-  create(input: { artifactId: string; name: string }): Promise<ShareRecord>;
+  /**
+   * Creates a new share with a fresh unguessable token.
+   *
+   * Accepts `{ siteId, name, pages }` — see {@link CreateShareInput} for details.
+   * The pages array must be non-empty; throws otherwise.
+   */
+  create(input: CreateShareInput): Promise<ShareRecord>;
 
   /** Returns the share with the given token, or null if not found. */
   findByToken(token: string): Promise<ShareRecord | null>;

@@ -177,6 +177,40 @@ describe('FilesystemArchiveStore', () => {
     });
   });
 
+  describe('path-traversal hardening', () => {
+    it('read() returns null for a traversal id instead of escaping rootDir', async () => {
+      const s = new FilesystemArchiveStore(tmpDir);
+      // A real file outside tmpDir — must not be readable via a crafted id.
+      // We just verify null is returned without any fs access outside the sandbox.
+      expect(await s.read('../../etc/passwd')).toBeNull();
+    });
+
+    it('read() returns null for a dot-dot id with URL-decoded separators', async () => {
+      const s = new FilesystemArchiveStore(tmpDir);
+      expect(await s.read('../secret')).toBeNull();
+    });
+
+    it('exists() returns false for a traversal id instead of escaping rootDir', async () => {
+      const s = new FilesystemArchiveStore(tmpDir);
+      expect(await s.exists('../../etc/passwd')).toBe(false);
+    });
+
+    it('existsMany() returns an empty set when all ids are traversal attempts', async () => {
+      const s = new FilesystemArchiveStore(tmpDir);
+      const result = await s.existsMany(['../../etc/passwd', '../foo']);
+      expect(result.size).toBe(0);
+    });
+
+    it('existsMany() excludes traversal ids while still resolving valid ids', async () => {
+      const s = new FilesystemArchiveStore(tmpDir);
+      const validId = await s.save(baseRecord);
+      const result = await s.existsMany([validId, '../../etc/passwd', '../foo']);
+      expect(result.has(validId)).toBe(true);
+      expect(result.has('../../etc/passwd')).toBe(false);
+      expect(result.has('../foo')).toBe(false);
+    });
+  });
+
   describe('getChildren', () => {
     it('returns children sorted by iterationRound ascending', async () => {
       const s = new FilesystemArchiveStore(tmpDir);

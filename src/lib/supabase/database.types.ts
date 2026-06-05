@@ -71,6 +71,83 @@ export type Database = {
           },
         ];
       };
+      contracts: {
+        Row: {
+          artifact_id: string;
+          contract_md: string;
+          cost: number | null;
+          created_at: string;
+          model_id: string | null;
+          tokens: Json;
+          tokens_css: string;
+        };
+        Insert: {
+          artifact_id: string;
+          contract_md: string;
+          cost?: number | null;
+          created_at?: string;
+          model_id?: string | null;
+          tokens: Json;
+          tokens_css: string;
+        };
+        Update: {
+          artifact_id?: string;
+          contract_md?: string;
+          cost?: number | null;
+          created_at?: string;
+          model_id?: string | null;
+          tokens?: Json;
+          tokens_css?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'contracts_artifact_id_fkey';
+            columns: ['artifact_id'];
+            isOneToOne: true;
+            referencedRelation: 'artifacts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      share_pages: {
+        Row: {
+          artifact_id: string;
+          position: number;
+          slug: string;
+          title: string;
+          token: string;
+        };
+        Insert: {
+          artifact_id: string;
+          position?: number;
+          slug: string;
+          title: string;
+          token: string;
+        };
+        Update: {
+          artifact_id?: string;
+          position?: number;
+          slug?: string;
+          title?: string;
+          token?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'share_pages_artifact_id_fkey';
+            columns: ['artifact_id'];
+            isOneToOne: false;
+            referencedRelation: 'artifacts';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'share_pages_token_fkey';
+            columns: ['token'];
+            isOneToOne: false;
+            referencedRelation: 'shares';
+            referencedColumns: ['token'];
+          },
+        ];
+      };
       share_view_buckets: {
         Row: {
           bucket_started_at: string;
@@ -96,41 +173,104 @@ export type Database = {
       };
       shares: {
         Row: {
-          artifact_id: string;
           created_at: string;
           last_viewed_at: string | null;
           name: string;
           revoked_at: string | null;
+          site_id: string;
           token: string;
           view_count: number;
         };
         Insert: {
-          artifact_id: string;
           created_at?: string;
           last_viewed_at?: string | null;
           name: string;
           revoked_at?: string | null;
+          site_id: string;
           token: string;
           view_count?: number;
         };
         Update: {
-          artifact_id?: string;
           created_at?: string;
           last_viewed_at?: string | null;
           name?: string;
           revoked_at?: string | null;
+          site_id?: string;
           token?: string;
           view_count?: number;
         };
         Relationships: [
           {
-            foreignKeyName: 'shares_artifact_id_fkey';
+            foreignKeyName: 'shares_site_id_fkey';
+            columns: ['site_id'];
+            isOneToOne: false;
+            referencedRelation: 'sites';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      site_pages: {
+        Row: {
+          artifact_id: string;
+          created_at: string;
+          position: number;
+          site_id: string;
+          slug: string;
+          title: string;
+        };
+        Insert: {
+          artifact_id: string;
+          created_at?: string;
+          position?: number;
+          site_id: string;
+          slug: string;
+          title: string;
+        };
+        Update: {
+          artifact_id?: string;
+          created_at?: string;
+          position?: number;
+          site_id?: string;
+          slug?: string;
+          title?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'site_pages_artifact_id_fkey';
             columns: ['artifact_id'];
             isOneToOne: false;
             referencedRelation: 'artifacts';
             referencedColumns: ['id'];
           },
+          {
+            foreignKeyName: 'site_pages_site_id_fkey';
+            columns: ['site_id'];
+            isOneToOne: false;
+            referencedRelation: 'sites';
+            referencedColumns: ['id'];
+          },
         ];
+      };
+      sites: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          name: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {

@@ -30,7 +30,17 @@ import { dedupedRequest } from '@/lib/wizard/deduped-request';
 
 export type GenerationStreamRequest =
   | { kind: 'generate'; recipe: Recipe }
-  | { kind: 'iterate'; recipe: Recipe; previousArtifactId: string; feedback: string };
+  | {
+      kind: 'iterate';
+      recipe: Recipe;
+      previousArtifactId: string;
+      feedback: string;
+      /** Optional — when provided, the route also advances site_pages.artifact_id server-side. */
+      siteId?: string;
+      /** Optional — must be paired with siteId to advance the page pointer. */
+      slug?: string;
+    }
+  | { kind: 'subpage'; siteId: string; slug: string; title: string; brief: string };
 
 export type StreamPhase = 'idle' | 'streaming' | 'images' | 'done' | 'error';
 
@@ -45,6 +55,8 @@ export interface GenerationStreamResult {
   html: string;
   imageCount: number;
   artifactId: string | null;
+  /** The site created during generation. Populated on `done`. */
+  siteId: string | null;
   cost: number | null;
   usage: GenerationStreamUsage | null;
   imagesInjected: number | null;
@@ -56,6 +68,7 @@ const INITIAL_RESULT: GenerationStreamResult = {
   html: '',
   imageCount: 0,
   artifactId: null,
+  siteId: null,
   cost: null,
   usage: null,
   imagesInjected: null,
@@ -64,6 +77,7 @@ const INITIAL_RESULT: GenerationStreamResult = {
 
 interface SSEDataDone {
   artifactId?: string;
+  siteId?: string;
   cost?: number;
   usage?: GenerationStreamUsage;
   imagesInjected?: number;
@@ -81,18 +95,31 @@ export function useGenerationStream(
 
     let cancelled = false;
 
-    const endpoint = request.kind === 'generate' ? '/api/generate' : '/api/iterate';
+    const endpoint =
+      request.kind === 'subpage'
+        ? `/api/site/${request.siteId}/page`
+        : request.kind === 'generate'
+          ? '/api/generate'
+          : '/api/iterate';
     const body =
       request.kind === 'generate'
         ? { recipe: request.recipe }
-        : {
-            // Rule 1: no `previousHtml`. The route reads parent.htmlSource
-            // server-side. Keeps the wire body small and impossible to
-            // poison with multi-MB post-injection HTML.
-            recipe: request.recipe,
-            previousArtifactId: request.previousArtifactId,
-            feedback: request.feedback,
-          };
+        : request.kind === 'subpage'
+          ? { slug: request.slug, title: request.title, brief: request.brief }
+          : {
+              // Rule 1: no `previousHtml`. The route reads parent.htmlSource
+              // server-side. Keeps the wire body small and impossible to
+              // poison with multi-MB post-injection HTML.
+              recipe: request.recipe,
+              previousArtifactId: request.previousArtifactId,
+              feedback: request.feedback,
+              // When present, the route also advances site_pages.artifact_id
+              // server-side so the page pointer stays in sync.
+              // undefined values are dropped by JSON.stringify — no need for
+              // conditional spreads, and the Zod schema accepts both as optional.
+              siteId: request.siteId,
+              slug: request.slug,
+            };
 
     const { promise, release } = dedupedRequest(`${request.kind}:${runKey}`, async (signal) => {
       const res = await fetch(endpoint, {
@@ -197,6 +224,7 @@ export function useGenerationStream(
                 html: accHtml,
                 imageCount,
                 artifactId: d.artifactId ?? null,
+                siteId: d.siteId ?? null,
                 cost: d.cost ?? null,
                 usage: d.usage ?? null,
                 imagesInjected: d.imagesInjected ?? null,

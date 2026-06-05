@@ -4,7 +4,10 @@ import { getAnthropicClient } from '@/lib/anthropic/client';
 import { defaultArchiveStore } from '@/lib/generation/archive';
 import { injectImages, countImagePlaceholders } from '@/lib/generation/inject-images';
 import { estimateCost } from '@/lib/cost';
-import type { Recipe } from '@/lib/types';
+import { defaultSiteStore } from '@/lib/sites/site-store-factory';
+import { RecipeSchema } from '@/lib/schemas';
+import { defaultSettingsStore } from '@/lib/settings/store';
+import { applyModelConfig, DEFAULT_MODEL_SETTINGS } from '@/lib/settings/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -21,15 +24,21 @@ interface UsageTracking {
 }
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json()) as { recipe: Recipe };
-  const recipe = body.recipe;
-  if (!recipe?.aesthetic?.id || !recipe.layout?.id) {
-    return new Response(JSON.stringify({ error: 'recipe missing required buckets' }), {
-      status: 400,
-    });
+  // Validate the recipe BEFORE spending any tokens — fail fast on bad input.
+  const body = await req.json().catch(() => null);
+  const parsed = RecipeSchema.safeParse(body?.recipe);
+  if (!parsed.success) {
+    return new Response(
+      JSON.stringify({ error: parsed.error.issues[0]?.message ?? 'invalid recipe' }),
+      { status: 400 },
+    );
   }
+  const recipe = parsed.data;
 
-  const request = await assembleGenerationRequest(recipe);
+  // Apply operator-configured model + effort (from /admin); defaults preserve
+  // the built-in behavior when nothing has been saved.
+  const settings = (await defaultSettingsStore().get()) ?? DEFAULT_MODEL_SETTINGS;
+  const request = applyModelConfig(await assembleGenerationRequest(recipe), settings.generate);
   const client = getAnthropicClient();
 
   const stream = new ReadableStream({
@@ -40,6 +49,7 @@ export async function POST(req: NextRequest) {
       };
 
       let html = '';
+      let archiveId: string | undefined;
       const usage: UsageTracking = {
         inputTokens: 0,
         outputTokens: 0,
@@ -57,6 +67,7 @@ export async function POST(req: NextRequest) {
             max_tokens: request.max_tokens,
             system: request.system,
             messages: request.messages,
+            ...(request.thinking ? { thinking: request.thinking } : {}),
           },
           { signal: req.signal },
         );
@@ -88,12 +99,13 @@ export async function POST(req: NextRequest) {
         const cost = estimateCost({
           model: request.model,
           inputTokens: usage.inputTokens,
+          cacheCreationTokens: usage.cacheCreationTokens,
           cacheReadTokens: usage.cacheReadTokens,
           outputTokens: usage.outputTokens,
         });
 
         const archive = defaultArchiveStore();
-        const archiveId = await archive.save({
+        archiveId = await archive.save({
           recipeSummary: `${recipe.aesthetic.id} + ${recipe.layout.id}`,
           html,
           htmlSource,
@@ -105,8 +117,23 @@ export async function POST(req: NextRequest) {
           generatedAt: new Date().toISOString(),
         });
 
+        // Create the site and its landing page now that the artifact exists.
+        // This must happen AFTER archive.save so the FK reference is valid.
+        // It sits inside the same try block, after the AbortError guard, so
+        // an aborted generation (client disconnect) skips BOTH save and site
+        // creation — Rule 9: no orphan sites on abort.
+        const siteStore = defaultSiteStore();
+        const site = await siteStore.createSite({ name: recipe.brief.projectName });
+        await siteStore.addPage(site.id, {
+          slug: '/',
+          title: 'Home',
+          artifactId: archiveId,
+          position: 0,
+        });
+
         send('done', {
           artifactId: archiveId,
+          siteId: site.id,
           usage,
           cost,
           imagesInjected: placeholderCount,
@@ -119,7 +146,12 @@ export async function POST(req: NextRequest) {
         if (err instanceof Error && (err.name === 'AbortError' || req.signal.aborted)) {
           return;
         }
-        send('error', { error: errorMessage(err) });
+        // Include archiveId if archive.save succeeded before the failure —
+        // the saved artifact is otherwise an unreachable zombie with no recovery path.
+        send('error', {
+          error: errorMessage(err),
+          ...(archiveId ? { artifactId: archiveId } : {}),
+        });
       } finally {
         try {
           controller.close();

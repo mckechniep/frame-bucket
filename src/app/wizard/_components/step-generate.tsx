@@ -7,8 +7,11 @@ import { useWizardStore } from '@/lib/wizard/store';
 
 import { useGenerationStream, type GenerationStreamRequest } from '../_hooks/use-generation-stream';
 import { useSharesList } from '../_hooks/use-shares-list';
+import { AddPageModal } from './add-page-modal';
 import { CreateShareModal } from './create-share-modal';
 import { IterationHistory } from './iteration-history';
+import { PagePreviewFrame } from './page-preview-frame';
+import { PageSwitcher } from './page-switcher';
 import { RecipeSummaryChip } from './recipe-summary';
 import { RefinePanel } from './refine-panel';
 import { SideBySidePreview } from './side-by-side-preview';
@@ -33,6 +36,7 @@ interface IterateOverride {
 interface IterationContext {
   parentArtifactId: string;
   parentRound: number;
+  targetSlug: string;
 }
 
 export function StepGenerate() {
@@ -42,6 +46,23 @@ export function StepGenerate() {
   const compareWithArtifactId = useWizardStore((s) => s.compareWithArtifactId);
   const appendRound = useWizardStore((s) => s.appendRound);
   const setActiveArtifactId = useWizardStore((s) => s.setActiveArtifactId);
+  const setSite = useWizardStore((s) => s.setSite);
+  const addPage = useWizardStore((s) => s.addPage);
+  const setActiveSlug = useWizardStore((s) => s.setActiveSlug);
+  const setPageArtifact = useWizardStore((s) => s.setPageArtifact);
+  const siteId = useWizardStore((s) => s.siteId);
+  const pages = useWizardStore((s) => s.pages);
+  const activeSlug = useWizardStore((s) => s.activeSlug);
+
+  const [addPageOpen, setAddPageOpen] = useState(false);
+
+  // The preview gate below keys off the *main* generation stream's phase. When
+  // that stream is in 'error' (a failed generate/refine), it must not blank the
+  // canvas for an artifact the user has since chosen via page-switch or a
+  // successful add-page (those run a *different* stream). This flag lets such a
+  // navigation supersede the stale error; a fresh refine resets it so the new
+  // attempt's own error can surface again.
+  const [staleErrorDismissed, setStaleErrorDismissed] = useState(false);
 
   const hasExistingRound = rounds.length > 0;
 
@@ -97,6 +118,12 @@ export function StepGenerate() {
         cost: stream.cost ?? 0,
         generatedAt: new Date().toISOString(),
       });
+      // Advance the active page's stored artifact pointer so switching away
+      // from and back to this page shows the iterated artifact, not the original.
+      // Use the slug captured at submit time (iterationCtx.targetSlug) — not
+      // the live activeSlug — to guard against the user switching pages while
+      // the stream is in-flight (stale-closure bug).
+      setPageArtifact(iterationCtx.targetSlug, stream.artifactId);
       iterationContextRef.current = null;
     } else {
       appendRound({
@@ -109,22 +136,45 @@ export function StepGenerate() {
       });
     }
     setActiveArtifactId(stream.artifactId);
+    // Establish the site and its initial landing page on first generation.
+    // setSite replaces the old setSiteId call — it atomically sets siteId,
+    // pages ([{ slug:'/', title:'Home', artifactId, position:0 }]), and
+    // resets activeSlug to '/'. Only fires when siteId + artifactId are both
+    // present AND no pages exist yet (guards against double-init on re-entry).
+    if (stream.siteId && stream.artifactId && pages.length === 0) {
+      setSite(stream.siteId, [
+        { slug: '/', title: 'Home', artifactId: stream.artifactId, position: 0 },
+      ]);
+    }
   }, [
     stream.phase,
     stream.artifactId,
+    stream.siteId,
     stream.cost,
     rounds,
+    pages.length,
     selectedRecipe,
     appendRound,
     setActiveArtifactId,
+    setSite,
+    setPageArtifact,
   ]);
 
   const handleRefine = useCallback(
     (feedback: string) => {
       if (!selectedRecipe) return;
-      const latest = rounds[rounds.length - 1];
+      // Iterate the page the operator is currently viewing: parent off the
+      // active page's current round, not the globally last round. Now that
+      // subpages are rounds too, `rounds[last]` could belong to a different
+      // page (e.g. the most recently added one), which would refine the wrong
+      // artifact and advance the wrong page pointer.
+      const latest =
+        rounds.find((r) => r.artifactId === activeArtifactId) ?? rounds[rounds.length - 1];
       if (!latest) return;
       if (latest.iterationRound >= MAX_ROUNDS) return;
+
+      // New attempt: let its own outcome (including an error) drive the canvas.
+      setStaleErrorDismissed(false);
 
       // Parent metadata is captured here at submit time and threaded to the
       // done-effect via the ref. Each iteration overwrites the ref; the
@@ -132,6 +182,7 @@ export function StepGenerate() {
       iterationContextRef.current = {
         parentArtifactId: latest.artifactId,
         parentRound: latest.iterationRound,
+        targetSlug: activeSlug,
       };
       setIterateOverride({
         runKey: `iterate:${latest.artifactId}:${Date.now()}`,
@@ -140,10 +191,27 @@ export function StepGenerate() {
           recipe: selectedRecipe,
           previousArtifactId: latest.artifactId,
           feedback,
+          // Pass site context so the route advances site_pages.artifact_id
+          // server-side alongside the client-side setPageArtifact call.
+          // undefined values are dropped by JSON.stringify; Zod schema accepts both as optional.
+          siteId: siteId ?? undefined,
+          slug: activeSlug || undefined,
         },
       });
     },
-    [selectedRecipe, rounds],
+    [selectedRecipe, rounds, siteId, activeSlug, activeArtifactId],
+  );
+
+  const handleSwitch = useCallback(
+    (slug: string) => {
+      const page = pages.find((p) => p.slug === slug);
+      if (!page) return;
+      setActiveSlug(slug);
+      setActiveArtifactId(page.artifactId);
+      // Viewing a chosen page supersedes any stale main-stream error.
+      setStaleErrorDismissed(true);
+    },
+    [pages, setActiveSlug, setActiveArtifactId],
   );
 
   const latestRound = rounds[rounds.length - 1];
@@ -159,7 +227,14 @@ export function StepGenerate() {
   // The finished preview lands on `done` via the stable /preview/<id> route.
   const previewArtifactId = activeArtifactId ?? latestRound?.artifactId ?? null;
   const showGeneratingPane = isStreaming;
-  const showStoredPreview = !showGeneratingPane && !!previewArtifactId && stream.phase !== 'error';
+  const showStoredPreview =
+    !showGeneratingPane && !!previewArtifactId && (stream.phase !== 'error' || staleErrorDismissed);
+
+  // Nav injection in the wizard preview is handled by PagePreviewFrame:
+  // it fetches raw HTML from /api/artifact/[id]/html, injects the current
+  // site nav client-side via srcDoc, and re-injects on store changes without
+  // refetching — closing the M6 wizard-preview nav injection gap.
+
   const showError = stream.phase === 'error' && !rateLimited && !showStoredPreview;
 
   // Side-by-side only fires when comparing AND the comparison target differs
@@ -204,6 +279,15 @@ export function StepGenerate() {
         {hasExistingRound ? <IterationHistory shares={shares} /> : null}
 
         <div className="min-w-0 flex flex-col gap-[var(--space-6)]">
+          {/* Page switcher — hidden when pages array is empty (pre-generation). */}
+          <PageSwitcher
+            pages={pages}
+            activeSlug={activeSlug}
+            onSwitch={handleSwitch}
+            onAddPage={() => setAddPageOpen(true)}
+            disabled={isStreaming}
+          />
+
           {showGeneratingPane ? (
             <GeneratingPane
               phase={stream.phase}
@@ -220,13 +304,7 @@ export function StepGenerate() {
           ) : null}
 
           {showStoredPreview && !showSideBySide && previewArtifactId ? (
-            <iframe
-              key={previewArtifactId}
-              src={`/preview/${previewArtifactId}`}
-              sandbox="allow-scripts"
-              className="h-[720px] w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white"
-              title="Generated artifact preview"
-            />
+            <PagePreviewFrame artifactId={previewArtifactId} title="Generated artifact preview" />
           ) : null}
 
           {showError ? <ErrorPane message={stream.error ?? 'unknown error'} /> : null}
@@ -242,7 +320,11 @@ export function StepGenerate() {
           ) : null}
 
           {hasExistingRound && !isStreaming && previewArtifactId ? (
-            <FinishActions artifactId={previewArtifactId} onShareCreated={refreshShares} />
+            <FinishActions
+              artifactId={previewArtifactId}
+              siteId={siteId}
+              onShareCreated={refreshShares}
+            />
           ) : null}
 
           {hasExistingRound ? (
@@ -256,6 +338,36 @@ export function StepGenerate() {
           ) : null}
         </div>
       </div>
+
+      {/* AddPageModal — rendered at StepGenerate level so its unmount on close
+          triggers the billable-stream abort in useGenerationStream's cleanup. */}
+      <AddPageModal
+        open={addPageOpen}
+        onClose={() => setAddPageOpen(false)}
+        siteId={siteId ?? ''}
+        existingSlugs={pages.map((p) => p.slug)}
+        nextPosition={pages.length === 0 ? 0 : Math.max(...pages.map((p) => p.position)) + 1}
+        onSuccess={(page, meta) => {
+          addPage(page);
+          // Record the subpage as the "Original" (root) round of its own
+          // per-page iteration chain, carrying its real generation cost — so
+          // the History panel shows it and per-page refine can parent off it,
+          // exactly like the landing page's round.
+          appendRound({
+            artifactId: page.artifactId,
+            parentArtifactId: null,
+            iterationRound: 0,
+            recipeSummary: page.title,
+            cost: meta.cost,
+            generatedAt: meta.generatedAt,
+          });
+          setActiveSlug(page.slug);
+          setActiveArtifactId(page.artifactId);
+          // A freshly added page must show even if a prior generate/refine
+          // left the main stream in an error phase.
+          setStaleErrorDismissed(true);
+        }}
+      />
     </section>
   );
 }
@@ -394,10 +506,11 @@ function GeneratingPane({ phase, imageCount, isIteration }: GeneratingPaneProps)
 
 interface FinishActionsProps {
   artifactId: string;
+  siteId: string | null;
   onShareCreated?: () => void;
 }
 
-function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
+function FinishActions({ artifactId, siteId, onShareCreated }: FinishActionsProps) {
   const brief = useWizardStore((s) => s.brief);
   const rounds = useWizardStore((s) => s.rounds);
   const [shareOpen, setShareOpen] = useState(false);
@@ -425,10 +538,49 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
           <button
             type="button"
             onClick={() => setShareOpen(true)}
-            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]"
+            disabled={!siteId}
+            className="inline-flex items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent)] px-[var(--space-5)] py-[var(--space-3)] text-[var(--text-base)] font-medium text-[var(--color-surface)] transition-transform duration-[var(--duration-fast)] hover:-translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             Create share link
           </button>
+
+          {/* Design contract download — only rendered once a site exists.
+              Uses the established <details>/<summary> disclosure pattern
+              (server-renderable, no extra JS) consistent with share-footer.tsx.
+              Points at the operator route: GET /api/site/<siteId>/contract
+              Valid filenames are EXACTLY contract.md, tokens.json, tokens.css
+              (verified against VALID_FILES in the route). */}
+          {siteId ? (
+            <details className="group">
+              <summary className="inline-flex cursor-pointer select-none list-none items-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-transparent px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-base)] text-[var(--color-ink-muted)] transition-[border-color,color,transform] duration-[var(--duration-fast)] hover:-translate-y-px hover:border-[var(--color-ink-muted)] hover:text-[var(--color-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-ink)]">
+                Design contract ↓
+              </summary>
+              <div className="mt-[var(--space-2)] flex flex-col items-end gap-[var(--space-1)] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-alt)] px-[var(--space-3)] py-[var(--space-2)]">
+                <a
+                  href={`/api/site/${siteId}/contract?file=contract.md`}
+                  download="contract.md"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Contract (Markdown)
+                </a>
+                <a
+                  href={`/api/site/${siteId}/contract?file=tokens.json`}
+                  download="tokens.json"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Tokens (JSON)
+                </a>
+                <a
+                  href={`/api/site/${siteId}/contract?file=tokens.css`}
+                  download="tokens.css"
+                  className="text-[var(--text-base)] text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline"
+                >
+                  Tokens (CSS)
+                </a>
+              </div>
+            </details>
+          ) : null}
+
           {/* Secondary action — "Open standalone" only. The destructive
               "Start a new project" was removed from here because it
               duplicated the top-nav <WizardStartOver/> (which now wears
@@ -450,7 +602,7 @@ function FinishActions({ artifactId, onShareCreated }: FinishActionsProps) {
       <CreateShareModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
-        artifactId={artifactId}
+        siteId={siteId}
         defaultName={defaultName}
         onSuccess={onShareCreated}
       />

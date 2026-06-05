@@ -1,13 +1,14 @@
 import type { IterationRequest } from '@/lib/types';
 import type { Recipe } from '@/lib/types/recipe';
 import type { AnthropicRequest, SystemBlock } from './assembler';
-import { loadCanonLayers } from './canon-layers';
+import { loadCanonLayers, formatInvariantBlock } from './canon-layers';
 import { formatBrief } from './format-brief';
 
 const ITERATION_DIRECTIVE =
   'Regenerate the full HTML, applying the feedback while preserving everything that works. ' +
   'Output the complete new HTML document, beginning with `<!DOCTYPE html>` and ending with `</html>`. ' +
-  'No markdown fences, no commentary.';
+  'No markdown fences, no commentary. ' +
+  'Preserve the <!-- fb:nav-links:start --> and <!-- fb:nav-links:end --> marker comments exactly as they appear, with at least one styled <a> anchor between them. Do not remove or relocate these comment markers.';
 
 function formatRecipeSummary(recipe: Recipe): string {
   const parts = [
@@ -36,7 +37,7 @@ export async function assembleIterationRequest(
     },
     {
       type: 'text',
-      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
+      text: formatInvariantBlock(layers),
       cache_control: { type: 'ephemeral' },
     },
   ];

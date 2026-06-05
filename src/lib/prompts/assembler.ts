@@ -1,5 +1,6 @@
 import type { Recipe, TaxonomyEntry } from '@/lib/types';
-import { loadCanonLayers } from './canon-layers';
+import type { ThinkingConfig } from '@/lib/settings/constants';
+import { loadCanonLayers, formatInvariantBlock } from './canon-layers';
 import { formatBrief } from './format-brief';
 
 export interface SystemBlock {
@@ -14,6 +15,8 @@ export interface AnthropicRequest {
   system: SystemBlock[];
   messages: Array<{ role: 'user'; content: string }>;
   stream: boolean;
+  /** Set by applyModelConfig when an effort level enables extended thinking. */
+  thinking?: ThinkingConfig;
 }
 
 function formatEntry(e: TaxonomyEntry): string {
@@ -55,7 +58,12 @@ function formatRecipe(recipe: Recipe): string {
 const GENERATION_DIRECTIVE = `Produce one complete, self-contained HTML file for this recipe.
 Apply the craft canon rigorously. Apply the aesthetic override if present.
 Obey the output contract strictly.
-Output ONLY the file. No commentary, no markdown fences, no explanations.`;
+Output ONLY the file. No commentary, no markdown fences, no explanations.
+Include a site navigation element appropriate to your design (it may be visually minimal). Wrap ONLY the navigation link anchors — not the surrounding <nav> or container — in these exact HTML comment markers:
+<!-- fb:nav-links:start -->
+<a href="/">...</a>
+<!-- fb:nav-links:end -->
+This page is currently the only page of its site, so render a single link with href="/" labeled with the project/site name. Do not omit these markers.`;
 
 export async function assembleGenerationRequest(recipe: Recipe): Promise<AnthropicRequest> {
   const layers = await loadCanonLayers(recipe);
@@ -67,7 +75,7 @@ export async function assembleGenerationRequest(recipe: Recipe): Promise<Anthrop
     },
     {
       type: 'text',
-      text: `## Frontend Design Posture\n\n${layers.posture}\n\n## Craft Canon\n\n${layers.baseCanon}\n\n## Generation Output Contract\n\n${layers.outputContract}`,
+      text: formatInvariantBlock(layers),
       cache_control: { type: 'ephemeral' },
     },
   ];

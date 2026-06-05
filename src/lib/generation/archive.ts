@@ -48,6 +48,27 @@ function stripIterSuffix(summary: string): string {
 export class FilesystemArchiveStore implements ArchiveStore {
   constructor(private readonly rootDir: string) {}
 
+  /**
+   * Resolves an artifact id to an absolute directory path, ensuring the
+   * result is contained within rootDir. Throws `ARTIFACT_ID_INVALID` if the
+   * resolved path would escape rootDir (i.e. a path-traversal attempt).
+   *
+   * Callers that perform reads (read/exists/existsMany) catch this error and
+   * return null/false so traversal ids degrade to "not found" (→ HTTP 404)
+   * rather than a 500 or an unintended filesystem access.
+   *
+   * save() lets the error propagate — a traversal id passed to save() is a
+   * programmer error, not a user-controlled 404 case.
+   */
+  private resolveArtifactDir(id: string): string {
+    const dir = path.resolve(this.rootDir, id);
+    const root = path.resolve(this.rootDir);
+    if (dir !== root && !dir.startsWith(root + path.sep)) {
+      throw new Error(`ARTIFACT_ID_INVALID: ${id}`);
+    }
+    return dir;
+  }
+
   async save(
     record: Omit<ArchiveRecord, 'iterationRound'> & Partial<Pick<ArchiveRecord, 'iterationRound'>>,
   ): Promise<string> {
@@ -61,7 +82,10 @@ export class FilesystemArchiveStore implements ArchiveStore {
       recipeSummary,
     };
     const id = timestampId();
-    const dir = path.join(this.rootDir, id);
+    // save() uses resolveArtifactDir to be consistent; the id is
+    // machine-generated (timestampId) so traversal is impossible here, but
+    // containment is still verified for belt-and-suspenders correctness.
+    const dir = this.resolveArtifactDir(id);
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(path.join(dir, 'index.html'), fullRecord.html, 'utf-8');
     if (fullRecord.htmlSource) {
@@ -81,9 +105,19 @@ export class FilesystemArchiveStore implements ArchiveStore {
    * Cheap existence check — only stats the artifact's meta.json. Used by the
    * wizard's hydrate-and-validate path on session start so we can drop
    * persisted rounds whose archive directories were wiped (common in dev).
+   *
+   * A traversal id (e.g. `../../etc/passwd`) returns false rather than
+   * throwing — the caller sees "not found" and proceeds normally.
    */
   async exists(id: string): Promise<boolean> {
-    const metaPath = path.join(this.rootDir, id, 'meta.json');
+    let dir: string;
+    try {
+      dir = this.resolveArtifactDir(id);
+    } catch {
+      // Traversal id — treat as not found.
+      return false;
+    }
+    const metaPath = path.join(dir, 'meta.json');
     try {
       await fs.access(metaPath);
       return true;
@@ -100,8 +134,22 @@ export class FilesystemArchiveStore implements ArchiveStore {
     return new Set(results.filter((r) => r.exists).map((r) => r.id));
   }
 
+  /**
+   * Reads and returns the archive record for the given id, or null if the
+   * artifact does not exist.
+   *
+   * A traversal id (e.g. `../../etc/passwd`) returns null rather than
+   * throwing — the caller sees "not found" (→ HTTP 404) without any
+   * unintended filesystem access outside rootDir.
+   */
   async read(id: string): Promise<ArchiveRecord | null> {
-    const dir = path.join(this.rootDir, id);
+    let dir: string;
+    try {
+      dir = this.resolveArtifactDir(id);
+    } catch {
+      // Traversal id — treat as not found.
+      return null;
+    }
     try {
       const [html, metaRaw] = await Promise.all([
         fs.readFile(path.join(dir, 'index.html'), 'utf-8'),

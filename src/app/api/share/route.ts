@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { defaultShareStore } from '@/lib/shares/share-store-factory';
-import { defaultArchiveStore } from '@/lib/generation/archive-factory';
+import { defaultSiteStore } from '@/lib/sites/site-store-factory';
+import type { SharePageSnapshot } from '@/lib/shares/share-store';
 
 export const runtime = 'nodejs';
 
 const CreateBody = z.object({
-  artifactId: z.string().min(1),
+  siteId: z.string().min(1),
   // Order matters: .trim() must run BEFORE .min(1) — otherwise a
   // whitespace-only input passes .min(1) (length > 0 pre-trim) and then
   // gets silently reduced to "". Verified empirically: `.min(1).max(120).trim()`
@@ -17,11 +18,12 @@ const CreateBody = z.object({
 /**
  * POST /api/share
  *
- * Creates a new share for an existing artifact. The browser-side wizard
- * (Phase 5d, Task 14) calls this when the user clicks "Create share link."
+ * Creates a new site-scoped share. The browser-side wizard calls this when
+ * the user clicks "Create share link." The API snapshots the site's current
+ * page manifest so recipients see exactly what was shared.
  *
- * Request:  { artifactId: string, name: string (1..120) }
- * Response: { token, url, name, createdAt }
+ * Request:  { siteId: string, name: string (1..120) }
+ * Response: { token, url, name, createdAt, pageCount }
  *
  * The absolute URL uses NEXT_PUBLIC_APP_URL so the wizard can copy it
  * straight to the clipboard without extra string-building on the client.
@@ -38,16 +40,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!parsed.success) {
     return errorResponse(400, 'INVALID', parsed.error.issues[0]?.message ?? 'Invalid input');
   }
-  const { artifactId, name } = parsed.data;
+  const { siteId, name } = parsed.data;
 
-  const archive = defaultArchiveStore();
-  const exists = await archive.exists(artifactId);
-  if (!exists) {
-    return errorResponse(404, 'NOT_FOUND', `Artifact ${artifactId} not found`);
+  const siteStore = defaultSiteStore();
+  const site = await siteStore.getSite(siteId);
+  if (!site) {
+    return errorResponse(404, 'NOT_FOUND', `Site ${siteId} not found`);
   }
 
+  const sitePages = await siteStore.listPages(siteId);
+  if (sitePages.length === 0) {
+    return errorResponse(400, 'EMPTY_SITE', 'Site has no pages — generate content first');
+  }
+
+  const pages: SharePageSnapshot[] = sitePages.map((p) => ({
+    slug: p.slug,
+    title: p.title,
+    artifactId: p.artifactId,
+    position: p.position,
+  }));
+
   const store = defaultShareStore();
-  const share = await store.create({ artifactId, name });
+  const share = await store.create({ siteId, name, pages });
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
   const url = `${appUrl}/s/${share.token}`;
@@ -57,6 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     url,
     name: share.name,
     createdAt: share.createdAt,
+    pageCount: pages.length,
   });
 }
 
@@ -66,7 +81,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
  * Returns all shares (newest first). Used by the /shares management page
  * (Task 17) and the wizard's history sidebar indicator (Task 16).
  *
- * No pagination in M5 — we expect < few hundred shares before M5b reconsiders.
+ * No pagination in M6 — expect < few hundred shares; reconsider later.
  */
 export async function GET(): Promise<NextResponse> {
   const store = defaultShareStore();

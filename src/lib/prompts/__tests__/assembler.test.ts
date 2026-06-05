@@ -75,4 +75,39 @@ describe('assembleGenerationRequest', () => {
     const req = await assembleGenerationRequest(r);
     expect(req.system.some((b) => b.text.includes('OVERRIDE'))).toBe(false);
   });
+
+  it('user content contains fb:nav-links:start marker', async () => {
+    const req = await assembleGenerationRequest(recipe);
+    const userText = req.messages[0]?.content ?? '';
+    expect(userText).toContain('fb:nav-links:start');
+  });
+
+  it('user content contains fb:nav-links:end marker', async () => {
+    const req = await assembleGenerationRequest(recipe);
+    const userText = req.messages[0]?.content ?? '';
+    expect(userText).toContain('fb:nav-links:end');
+  });
+
+  it('nav marker instruction lives in user content, not in any cached system block', async () => {
+    const req = await assembleGenerationRequest(recipe);
+    const cachedBlocks = req.system.filter((b) => b.cache_control?.type === 'ephemeral');
+    for (const block of cachedBlocks) {
+      expect(block.text).not.toContain('fb:nav-links');
+    }
+    expect(req.messages[0]?.content ?? '').toContain('fb:nav-links');
+  });
+
+  it('has exactly 2 ephemeral cache_control blocks when override is present', async () => {
+    const req = await assembleGenerationRequest(recipe);
+    const cached = req.system.filter((b) => b.cache_control?.type === 'ephemeral');
+    expect(cached).toHaveLength(2);
+  });
+
+  it('has exactly 1 ephemeral cache_control block when override is absent', async () => {
+    vi.mocked(loadAestheticOverride).mockResolvedValueOnce(null);
+    const r = { ...recipe, aesthetic: entry({ hasOverride: false }) };
+    const req = await assembleGenerationRequest(r);
+    const cached = req.system.filter((b) => b.cache_control?.type === 'ephemeral');
+    expect(cached).toHaveLength(1);
+  });
 });
